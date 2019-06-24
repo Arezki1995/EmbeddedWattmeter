@@ -1,36 +1,23 @@
-CC=gcc
-CFLAG=-Wall -Werror -Wextra
-TARGET=serialUSB
-FILE=file
-DEPENDENCIES=serialUSB.c
+export CC      = gcc
+export LD      = gcc
+export CLIB    = ar cq
+export CFLAGS  = -Wall -Werror -Wextra
+export CDEBUG  = -g
+export PROG	   = program		
 
+DIRS= src 
 
-# BUILDS
-default:$(DEPENDENCIES)
-	$(CC) -o $(TARGET) $(DEPENDENCIES) $(CFLAG)
+########## TARGETS ########
+all: $(patsubst %, _dir_%, $(DIRS))
 
-_plotBuild:$(DEPENDENCIES)
-	$(CC) -o $(TARGET) $(DEPENDENCIES) $(CFLAG) -D_PLOT
+$(patsubst %,_dir_%,$(DIRS)):
+	cd $(patsubst _dir_%,%,$@) && make
 
-_binaryBuild:$(DEPENDENCIES)
-	$(CC) -o $(TARGET) $(DEPENDENCIES) $(CFLAG) -D_BINARY
+plot: all
+	./bin/$(PROG) | gnuplot -p -e 'plot "/dev/stdin" using 1:2 title "ADC measurement" with lines'
 
-_debugBuild:$(DEPENDENCIES)
-	$(CC) -o $(TARGET) $(DEPENDENCIES) $(CFLAG) -D_DEBUG
+########### CLEAN #########
+clean: $(patsubst %, _clean_%, $(DIRS))
 
-
-
-# COMPILATION TARGETS
-ascii:_plotBuild
-	./$(TARGET) > $(FILE).data
-
-binary:_binaryBuild
-	./$(TARGET)
-
-debug:_debugBuild
-	./$(TARGET)
-
-plot:_plotBuild
-	./$(TARGET) | gnuplot -p -e 'plot "/dev/stdin" using 1:2 title "ADC measurement" with lines'
-clean:
-	$(RM) $(TARGET) $(FILE).bin $(FILE).data 
+$(patsubst %,_clean_%,$(DIRS)):
+	cd $(patsubst _clean_%,%,$@) && make clean
