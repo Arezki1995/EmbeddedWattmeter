@@ -46,16 +46,35 @@ int connexionServeurTCP(char *hote,char *service){
 //////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// TCP CLIENT : Message ////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////
-int sendTCPmsg(char* machine, char* port,char* message){
+int sendTCPmsg(char* machine, char* port,char* message, size_t length){
     int s;
-    /* Connection au serveur */
-    s=connexionServeurTCP(machine,port);
-    if(s<0){ fprintf(stderr,"Erreur de connexion au serveur\n"); exit(EXIT_FAILURE); }
+    int trials=0;
 
-    write(s,message,FRAME_SIZE);
+    // Try 3 times to connect to the TCP SERVER program on the remote machine
+    do
+    {
+        s=connexionServeurTCP(machine,port);
+        if(s>0) break;
+        else
+        {
+            fprintf(stderr,"[!] Reconnecting to Server(%d)\n",trials+1);
+            trials++;
+            usleep(10000);
+        }        
+
+    } while (trials<3);
+    
+    // when connexion is unavailable
+    if (trials==3) {
+        fprintf(stderr,"[!] Connexion failed. No internet or server program not running.\n");
+        return 0;
+    }
+    
+    write(s,message,length);
 
     /* On termine la connexion */
-    shutdown(s,SHUT_RDWR);
+    //shutdown(s,SHUT_RDWR);
+    close(s);
 
-    return 0;
+    return 1;
 }
