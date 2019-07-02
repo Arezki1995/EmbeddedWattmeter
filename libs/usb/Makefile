@@ -7,10 +7,10 @@ FILE=$(DATA_PATH)/file
 
 # build types
 
-_debugBuild:$(DEPENDENCIES)
-	$(CC) -o $(TARGET) -c $(DEPENDENCIES) $(CFLAG) $(CDEBUG) -D_DEBUG 
+_debugBuild:$(DEPENDENCIES) serialUSB.h
+	$(CC) -o $(TARGET) -c $(DEPENDENCIES) $(CFLAG) $(CDEBUG) -D_DEBUG -g
 
-_defBuild:$(DEPENDENCIES)
+_defBuild:$(DEPENDENCIES) serialUSB.h
 	$(CC) -o $(TARGET) -c $(DEPENDENCIES) $(CFLAG)
 
 
