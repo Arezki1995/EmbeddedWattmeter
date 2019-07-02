@@ -1,27 +1,46 @@
 #undef HID_ENABLED
 
-// Arduino Due ADC->DMA->USB 1MSPS
-// Input: Analog in A0
+// ADC->DMA->USB
+// Input: Analog in A0 - A10
 // Output: Raw stream of uint16_t in range 0-4095 on Native USB Serial/ACM
 
-// on linux, to stop the OS cooking your data: 
-// stty -F /dev/ttyACM0 raw -iexten -echo -echoe -echok -echoctl -echoke -onlcr
 
 volatile int bufn,obufn;
 uint16_t buf[4][256];   // 4 buffers of 256 readings
 
+//////
+int InterruptPin = 2;
+int outPin       = 10;
+volatile int state = LOW;
+ 
 //////////////////////////////////////////////////////////////////////
-void ADC_Handler(){     // move DMA pointers to next buffer
-  int f=ADC->ADC_ISR;
-  if (f&(1<<27)){
-   bufn=(bufn+1)&3;
-   ADC->ADC_RNPR=(uint32_t)buf[bufn];
-   ADC->ADC_RNCR=256;
-  } 
+void ADC_Handler(){     
+    // move DMA pointers to next buffer
+    int f=ADC->ADC_ISR;
+    if (f&(1<<27)){
+        bufn=(bufn+1)&3;
+        ADC->ADC_RNPR=(uint32_t)buf[bufn];
+        ADC->ADC_RNCR=256;
+    } 
 }
+//////////////////////////////////////////////////////////////////////
+void PinRead_ISR(){
+ state = !state;
+ digitalWrite(outPin, state); 
+}
+
+void setupIO(){
+   pinMode(outPin, OUTPUT);
+   attachInterrupt(digitalPinToInterrupt(InterruptPin), PinRead_ISR, FALLING);
+}
+
 
 //////////////////////////////////////////////////////////////////////
 void setup(){
+  
+  ////
+      setupIO();  
+  ////
   SerialUSB.begin(0);
   while(!SerialUSB);
   // Ask power manager controller to activate ADC module
@@ -33,7 +52,7 @@ void setup(){
   // Free running
   ADC->ADC_MR |=0x80; 
 
-  // Select ADC Channel 7 -> A0
+  // Select ADC Channel 7 -> A0 by default
   ADC->ADC_CHER=0x80; 
 
   // Enable ADC interrupt
@@ -74,7 +93,7 @@ void loop(){
     
   // send it - 512 bytes = 256 uint16_t
   SerialUSB.write((uint8_t *)buf[obufn],512); 
-
+  
   // Increment buffer index
   obufn=(obufn+1)&3;    
 }
