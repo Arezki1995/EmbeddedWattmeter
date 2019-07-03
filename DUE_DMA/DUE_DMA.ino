@@ -1,18 +1,20 @@
+#include "header.h"
+
 #undef HID_ENABLED
 
 // ADC->DMA->USB
 // Input: Analog in A0 - A10
 // Output: Raw stream of uint16_t in range 0-4095 on Native USB Serial/ACM
 
+int GLOBAL_STATE;
 
 volatile int bufn,obufn;
 uint16_t buf[4][256];   // 4 buffers of 256 readings
 
 //////
-int InterruptPin = 2;
-int outPin       = 10;
-volatile int state = LOW;
- 
+int InterruptPin = 53;
+
+static int CM[]={51, 50, 49, 48, 47, 46};
 //////////////////////////////////////////////////////////////////////
 void ADC_Handler(){     
     // move DMA pointers to next buffer
@@ -24,25 +26,58 @@ void ADC_Handler(){
     } 
 }
 //////////////////////////////////////////////////////////////////////
-void PinRead_ISR(){
- state = !state;
- digitalWrite(outPin, state); 
+void PinRead_ISR(){  
+   for(int i=0; i<6;i++){
+      int val = digitalRead(CM[i]);
+      if(val==0){
+          GLOBAL_STATE = GLOBAL_STATE & (~(0x0001<<i));
+      }else{
+          GLOBAL_STATE = GLOBAL_STATE | ( (0x0001<<i));
+      }
+   }
+   int ADC_MODE = GLOBAL_STATE & ADC_MODE_MSK;
+   // Select ADC Channel 7 -> A0
+   // Select ADC Channel 7 -> A11
+   switch(ADC_MODE) {
+   case ADC_MODE_A0   : ADC->ADC_CHER=ADC_A0_CH;  ADC->ADC_CHDR=(~ADC_A0_CH);  break; 
+   case ADC_MODE_A1   : ADC->ADC_CHER=ADC_A1_CH;  ADC->ADC_CHDR=(~ADC_A1_CH);  break; 
+   case ADC_MODE_A2   : ADC->ADC_CHER=ADC_A2_CH;  ADC->ADC_CHDR=(~ADC_A2_CH);  break; 
+   case ADC_MODE_A3   : ADC->ADC_CHER=ADC_A3_CH;  ADC->ADC_CHDR=(~ADC_A3_CH);  break; 
+   case ADC_MODE_A4   : ADC->ADC_CHER=ADC_A4_CH;  ADC->ADC_CHDR=(~ADC_A4_CH);  break; 
+   case ADC_MODE_A5   : ADC->ADC_CHER=ADC_A5_CH;  ADC->ADC_CHDR=(~ADC_A5_CH);  break; 
+   case ADC_MODE_A6   : ADC->ADC_CHER=ADC_A6_CH;  ADC->ADC_CHDR=(~ADC_A6_CH);  break;  
+   case ADC_MODE_A7   : ADC->ADC_CHER=ADC_A7_CH;  ADC->ADC_CHDR=(~ADC_A7_CH);  break;  
+   case ADC_MODE_A8   : ADC->ADC_CHER=ADC_A8_CH;  ADC->ADC_CHDR=(~ADC_A8_CH);  break; 
+   case ADC_MODE_A9   : ADC->ADC_CHER=ADC_A9_CH;  ADC->ADC_CHDR=(~ADC_A9_CH);  break; 
+   case ADC_MODE_A10  : ADC->ADC_CHER=ADC_A10_CH; ADC->ADC_CHDR=(~ADC_A10_CH); break;
+   case ADC_MODE_A11  : ADC->ADC_CHER=ADC_A11_CH; ADC->ADC_CHDR=(~ADC_A11_CH); break;
+   
+   case ADC_MODE_666K : _CLEAR_PRESCALER(ADC->ADC_MR);   ADC->ADC_MR|=(0x00<<8);   break;   
+   case ADC_MODE_280K : _CLEAR_PRESCALER(ADC->ADC_MR);   ADC->ADC_MR|=(0x04<<8);   break;
+   case ADC_MODE_125K : _CLEAR_PRESCALER(ADC->ADC_MR);   ADC->ADC_MR|=(0x09<<8);   break;
+   case ADC_MODE_60K  : _CLEAR_PRESCALER(ADC->ADC_MR);   ADC->ADC_MR|=(0x1F<<8);   break;
+      
+   default : 
+   ADC->ADC_CHER=ADC_A0_CH; break;
+  }
 }
-
+//////////////////////////////////////////////////////////////////////
 void setupIO(){
-   pinMode(outPin, OUTPUT);
-   attachInterrupt(digitalPinToInterrupt(InterruptPin), PinRead_ISR, FALLING);
+   for(int i=0; i<6;i++){
+      pinMode(CM[i], INPUT);
+   }
+   
+   //interruptPin
+   pinMode(InterruptPin, INPUT);
+   attachInterrupt( digitalPinToInterrupt(InterruptPin), PinRead_ISR, FALLING);
 }
-
-
 //////////////////////////////////////////////////////////////////////
 void setup(){
   
-  ////
-      setupIO();  
-  ////
+  setupIO();  
   SerialUSB.begin(0);
   while(!SerialUSB);
+  
   // Ask power manager controller to activate ADC module
   pmc_enable_periph_clk(ID_ADC);
 
