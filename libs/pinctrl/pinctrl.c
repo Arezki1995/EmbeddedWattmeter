@@ -6,6 +6,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include "pinctrl.h"
+
+#define NB_PINS 7
+#define VALUE_PATH_SIZE 30
+#define DIRECTION_PATH_SIZE 35
+#define BUFFER_MAX 3
 
 #define IN  0
 #define OUT 1
@@ -13,22 +20,30 @@
 #define LOW  0
 #define HIGH 1
 
-#define PIN  24 /* P1-18 */
-#define POUT 4  /* P1-07 */
+// command GPIO pins
+#define INTERRUPT_PIN 6
+static int CMD_PIN[NB_PINS]={16, 13, 20, 19, 12, 26,INTERRUPT_PIN};
+
 
 ///////////////////////////////////////////////////////////////////////////////////
 static int GPIOExport(int pin)
 {
-	#define BUFFER_MAX 3
 		char buffer[BUFFER_MAX];
 		ssize_t bytes_written;
+		int trial = 0;
 		int fd;
 
-		fd = open("/sys/class/gpio/export", O_WRONLY);
-		if (-1 == fd) {
-			fprintf(stderr, "Failed to open export for writing!\n");
-			return(-1);
+		do{
+			// Try 5 times to open the file if still error exit with warning
+			trial++;
+			fd = open("/sys/class/gpio/export", O_WRONLY);
+			if(trial > 5) {
+				fprintf(stderr, "[!] GPIO: Failed to open export for writing!\n");
+				return(-1);
+			}
+			usleep(10);
 		}
+		while (-1 == fd);
 
 		bytes_written = snprintf(buffer, BUFFER_MAX, "%d", pin);
 		write(fd, buffer, bytes_written);
@@ -44,7 +59,7 @@ static int GPIOUnexport(int pin)
 
 		fd = open("/sys/class/gpio/unexport", O_WRONLY);
 		if (-1 == fd) {
-			fprintf(stderr, "Failed to open unexport for writing!\n");
+			fprintf(stderr, "[!] GPIO: Failed to open unexport for writing!\n");
 			return(-1);
 		}
 
@@ -56,21 +71,20 @@ static int GPIOUnexport(int pin)
 ///////////////////////////////////////////////////////////////////////////////////
 static int GPIODirection(int pin, int dir)
 {
+		// Construct path
+		char path[DIRECTION_PATH_SIZE];
+		snprintf(path, DIRECTION_PATH_SIZE, "/sys/class/gpio/gpio%d/direction", pin);
+		
 		static const char s_directions_str[]  = "in\0out";
-
-	#define DIRECTION_MAX 35
-		char path[DIRECTION_MAX];
 		int fd;
-
-		snprintf(path, DIRECTION_MAX, "/sys/class/gpio/gpio%d/direction", pin);
 		fd = open(path, O_WRONLY);
 		if (-1 == fd) {
-			fprintf(stderr, "Failed to open gpio direction for writing!\n");
+			fprintf(stderr, "[!] GPIO: Failed to open gpio direction for writing!\n");
 			return(-1);
 		}
 
 		if (-1 == write(fd, &s_directions_str[IN == dir ? 0 : 3], IN == dir ? 2 : 3)) {
-			fprintf(stderr, "Failed to set direction!\n");
+			fprintf(stderr, "[!] GPIO: Failed to set direction!\n");
 			return(-1);
 		}
 
@@ -80,12 +94,14 @@ static int GPIODirection(int pin, int dir)
 ///////////////////////////////////////////////////////////////////////////////////
 static int GPIORead(int pin)
 {
-	#define VALUE_MAX 30
-		char path[VALUE_MAX];
+		// Construct path
+		
+		char path[VALUE_PATH_SIZE];
+		snprintf(path, VALUE_PATH_SIZE, "/sys/class/gpio/gpio%d/value", pin);
+
 		char value_str[3];
 		int fd;
 
-		snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", pin);
 		fd = open(path, O_RDONLY);
 		if (-1 == fd) {
 			fprintf(stderr, "Failed to open gpio value for reading!\n");
@@ -106,13 +122,14 @@ static int GPIOWrite(int pin, int value)
 {
 	static const char s_values_str[] = "01";
 
-	char path[VALUE_MAX];
-	int fd;
+	// Construct path
+	char path[VALUE_PATH_SIZE];
+	snprintf(path, VALUE_PATH_SIZE, "/sys/class/gpio/gpio%d/value", pin);
 
-	snprintf(path, VALUE_MAX, "/sys/class/gpio/gpio%d/value", pin);
+	int fd;
 	fd = open(path, O_WRONLY);
 	if (-1 == fd) {
-		fprintf(stderr, "Failed to open gpio value for writing!\n");
+		fprintf(stderr, "[!] GPIO: Failed to open gpio value for writing!\n");
 		return(-1);
 	}
 
@@ -125,33 +142,64 @@ static int GPIOWrite(int pin, int value)
 	return(0);
 }
 ///////////////////////////////////////////////////////////////////////////////////
+int EnableCommandPins(){
+	// Enable GPIO pins
+	for(int i=0;i<NB_PINS;i++){
+		if (-1 == GPIOExport( CMD_PIN[i] ) )  return(1);
+	}
+}
+///////////////////////////////////////////////////////////////////////////////////
+int SetCommandPinsDirection(){
+	// Set GPIO directions
+	for(int i=0;i<NB_PINS;i++){
+		if ( -1 == GPIODirection( CMD_PIN[i], OUT) ) return(1); 
+	}
+}
+///////////////////////////////////////////////////////////////////////////////////
+int writeCommand(int cmd){
+	for(int i=0; i<NB_PINS-1; i++){
+		if (-1 == GPIOWrite( CMD_PIN[i], _GET_VALUE(cmd,i))) return(3);
+	}
+	
+	// Create falling edge to trigger DUE interrupt to read the bus
+	if (-1 == GPIOWrite( INTERRUPT_PIN, HIGH)) return(3);
+	usleep(5);
+	if (-1 == GPIOWrite( INTERRUPT_PIN, LOW)) return(3);
+	return 0;
+}
+///////////////////////////////////////////////////////////////////////////////////
+int DisableCommandPins(){
+	// Disable GPIO is
+	for(int i=0; i<NB_PINS; i++){
+		if (-1 == GPIOUnexport(CMD_PIN[i]))  return(4);
+	}
+}
+////////////////////////////////////////////////////////////////////////////////
+void signal_handler(int signal_number) {
+    // Exit cleanup code here
+	if(signal_number==SIGINT){
+        printf("\nCleaning...\n");
+		DisableCommandPins();
+		exit(0);
+    }
+}
+///////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-	int repeat = 10;
-	
-	// Enable GPIO pins
-	if (-1 == GPIOExport(POUT) || -1 == GPIOExport(PIN))
-		return(1);
-
-	// Set GPIO directions
-	if (-1 == GPIODirection(POUT, OUT) || -1 == GPIODirection(PIN, IN))
-		return(2);
-
-	do {
-	// Write GPIO value
-		if (-1 == GPIOWrite(POUT, repeat % 2))
-			return(3);
-
-		// Read GPIO value
-		printf("I'm reading %d in GPIO %d\n", GPIORead(PIN), PIN);
-
-		usleep(500 * 1000);
+	EnableCommandPins();
+	SetCommandPinsDirection();
+	int status;
+	//int cmd = ADC_MODE_A1;
+	while(1){
+		for(int k=0 ; k<12; k++){
+		status=writeCommand(k);
+		printf("reading A%d\n",k);
+		sleep(1);
 	}
-	while (repeat--);
+	}
 
-	// Disable GPIO pins
-	if (-1 == GPIOUnexport(POUT) || -1 == GPIOUnexport(PIN)) return(4);
-
+	
+	DisableCommandPins();
 	return(0);
 }
