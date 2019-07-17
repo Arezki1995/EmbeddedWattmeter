@@ -1,7 +1,7 @@
 BIN_PATH =./
 
 TARGET=$(BIN_PATH)/pinctrl
-DEPENDENCIES=pinctrl.c
+DEPENDENCIES=pinctrl.c pinctrl.h
 
 
 # build types

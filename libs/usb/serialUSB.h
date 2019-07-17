@@ -6,19 +6,28 @@
 	#define AVG_SAMPLING_RATE 666625.0
 
 	//-- NB blocks To visalize
-	#define FOR_ONE_SEC   	2604
-	#define FOR_ONE_MILISEC	3
-
-	#define BLOCKS_NB   1
+	#define ONE_SEC   	2604
+	#define ONE_MILISEC	3
 
 	//--- YOU MUST NEVER CHANGE THIS
 	#define BLOCK_SIZE 	512
-
 	
-	u_int8_t*  readBlocksFromUSB();
-	u_int16_t* formatToMeasures(u_int8_t* table);
-	void displayMainBuffer(u_int8_t* table);
-	void displayMeasures(u_int16_t* measures);
-	void displayMeasuresWithUnits(u_int16_t* measures);
-	int  writeToBinaryFile(u_int16_t* measures);
+	// reads blocks of current measurements from USB depending on pinctrl configuration and selected channel
+	u_int8_t*  readCurrentRawValues(int fd, size_t numberOfBlocks);
+	
+	// ADC values are read one byte at a type although a signle measurement is 2 bytes
+	// this function assembles every two successive bytes into a 16bits measurement value.
+	u_int16_t* formatRawMeasurements(u_int8_t* table,size_t numberOfBlocks);
+
+	// Exports the measurement window as a grapher data file to be plotted
+	int 	   writeGrapherDataFile(u_int16_t* measures, size_t numberOfBlocks);
+	
+	// Exports the measuremet window as a CSV
+	int		   writeToCSV(u_int16_t* measures,size_t numberOfBlocks);
+
+	// Displays raw measurement
+	void       displayMeasures(u_int16_t* measures,size_t numberOfBlocks);
+
+	// displayConfiguration
+	void 	   displayConfiguration();
 #endif

@@ -1,32 +1,13 @@
-// This file blinks GPIO 4 (P1-07) while reading GPIO 24 (P1_18).
-
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <signal.h>
 #include "pinctrl.h"
 
-#define NB_PINS 7
-#define VALUE_PATH_SIZE 30
-#define DIRECTION_PATH_SIZE 35
-#define BUFFER_MAX 3
-
-#define IN  0
-#define OUT 1
-
-#define LOW  0
-#define HIGH 1
-
-// command GPIO pins
-#define INTERRUPT_PIN 6
-static int CMD_PIN[NB_PINS]={16, 13, 20, 19, 12, 26,INTERRUPT_PIN};
-
-
-///////////////////////////////////////////////////////////////////////////////////
-static int GPIOExport(int pin)
+////////////////////////////////////////////////////////////////////////////////
+int GPIOExport(int pin)
 {
 		char buffer[BUFFER_MAX];
 		ssize_t bytes_written;
@@ -50,8 +31,8 @@ static int GPIOExport(int pin)
 		close(fd);
 		return(0);
 }
-///////////////////////////////////////////////////////////////////////////////////
-static int GPIOUnexport(int pin)
+////////////////////////////////////////////////////////////////////////////////
+int GPIOUnexport(int pin)
 {
 		char buffer[BUFFER_MAX];
 		ssize_t bytes_written;
@@ -68,8 +49,8 @@ static int GPIOUnexport(int pin)
 		close(fd);
 		return(0);
 }
-///////////////////////////////////////////////////////////////////////////////////
-static int GPIODirection(int pin, int dir)
+////////////////////////////////////////////////////////////////////////////////
+int GPIODirection(int pin, int dir)
 {
 		// Construct path
 		char path[DIRECTION_PATH_SIZE];
@@ -91,8 +72,8 @@ static int GPIODirection(int pin, int dir)
 		close(fd);
 		return(0);
 }
-///////////////////////////////////////////////////////////////////////////////////
-static int GPIORead(int pin)
+///////////////////////////////////////////////////////////////////////////////
+int GPIORead(int pin)
 {
 		// Construct path
 		
@@ -117,8 +98,8 @@ static int GPIORead(int pin)
 
 		return(atoi(value_str));
 }
-///////////////////////////////////////////////////////////////////////////////////
-static int GPIOWrite(int pin, int value)
+/////////////////////////////////////////////////////////////////////////////
+int GPIOWrite(int pin, int value)
 {
 	static const char s_values_str[] = "01";
 
@@ -141,21 +122,21 @@ static int GPIOWrite(int pin, int value)
 	close(fd);
 	return(0);
 }
-///////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 int EnableCommandPins(){
 	// Enable GPIO pins
 	for(int i=0;i<NB_PINS;i++){
 		if (-1 == GPIOExport( CMD_PIN[i] ) )  return(1);
 	}
 }
-///////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 int SetCommandPinsDirection(){
 	// Set GPIO directions
 	for(int i=0;i<NB_PINS;i++){
 		if ( -1 == GPIODirection( CMD_PIN[i], OUT) ) return(1); 
 	}
 }
-///////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 int writeCommand(int cmd){
 	for(int i=0; i<NB_PINS-1; i++){
 		if (-1 == GPIOWrite( CMD_PIN[i], _GET_VALUE(cmd,i))) return(3);
@@ -167,7 +148,7 @@ int writeCommand(int cmd){
 	if (-1 == GPIOWrite( INTERRUPT_PIN, LOW)) return(3);
 	return 0;
 }
-///////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 int DisableCommandPins(){
 	// Disable GPIO is
 	for(int i=0; i<NB_PINS; i++){
@@ -175,31 +156,3 @@ int DisableCommandPins(){
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////
-void signal_handler(int signal_number) {
-    // Exit cleanup code here
-	if(signal_number==SIGINT){
-        printf("\nCleaning...\n");
-		DisableCommandPins();
-		exit(0);
-    }
-}
-///////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////
-int main(int argc, char *argv[])
-{
-	EnableCommandPins();
-	SetCommandPinsDirection();
-	int status;
-	//int cmd = ADC_MODE_A1;
-	while(1){
-		for(int k=0 ; k<12; k++){
-		status=writeCommand(k);
-		printf("reading A%d\n",k);
-		sleep(1);
-	}
-	}
-
-	
-	DisableCommandPins();
-	return(0);
-}

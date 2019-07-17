@@ -1,39 +1,20 @@
-BIN_PATH =../bin
-DATA_PATH=../data
-MODULES_PATH=../libs
+export CC      = gcc
+export LD      = gcc
+export CLIB    = ar cq
+export CFLAGS  = -Wall -Werror -Wextra
+export CDEBUG  = -g
+export PROG	   = program		
 
-TARGET=$(BIN_PATH)/program
+DIRS= acquisition interface graph
 
-DEPENDENCIES=$(BIN_PATH)/network.o $(BIN_PATH)/serialUSB.o $(BIN_PATH)/main.o
+########## TARGETS ########
+all: $(patsubst %, _dir_%, $(DIRS))
 
+$(patsubst %,_dir_%,$(DIRS)):
+	cd $(patsubst _dir_%,%,$@) && make
 
-###################### Modify build type here
-# build types
+########### CLEAN #########
+clean: $(patsubst %, _clean_%, $(DIRS))
 
-_debugBuild:$(DEPENDENCIES)
-	$(CC) -o $(TARGET) $(DEPENDENCIES) $(CFLAG) $(CDEBUG) -D_DEBUG 
-
-_defBuild:$(DEPENDENCIES)
-	$(CC) -o $(TARGET) $(DEPENDENCIES) $(CFLAG)
-
-
-###################### Modify build type here
-default: $(TARGET)
-
-
-$(TARGET):_debugBuild
-
-
-$(BIN_PATH)/main.o: main.c
-	$(CC) -o $@ -c main.c $(CFLAG)
-
-$(BIN_PATH)/serialUSB.o:$(MODULES_PATH)/usb/serialUSB.c
-	cd $(MODULES_PATH)/usb && make
-
-$(BIN_PATH)/network.o:$(MODULES_PATH)/network/network.c
-	cd $(MODULES_PATH)/network && make
-
-clean:
-	$(RM) $(TARGET) $(BIN_PATH)/main.o
-	cd $(MODULES_PATH)/usb && make clean
-	cd $(MODULES_PATH)/network && make clean
+$(patsubst %,_clean_%,$(DIRS)):
+	cd $(patsubst _clean_%,%,$@) && make clean
