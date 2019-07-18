@@ -31,16 +31,16 @@ int sendMessageToBox(BOX_SELECT box, int idFDM, int type, int command, void* msg
 
 	if(box==CONFIG_BOX){
 		// OTHER PARAMS HAVE TO BE INITIALIZED OUTSIDE
-		((API_MSG*) msg_ptr)->type			= type;
-		((API_MSG*) msg_ptr)->APICommand	= command;
+		((CONFIG_MSG*) msg_ptr)->type			= type;
+		((CONFIG_MSG*) msg_ptr)->APICommand	= command;
 		
-		msgsnd(idFDM, (API_MSG*) msg_ptr, sizeof(API_MSG), 0);
+		msgsnd(idFDM, (CONFIG_MSG*) msg_ptr, sizeof(CONFIG_MSG), 0);
 	}
 	else if(box==GRAPHER_BOX)
 	{
 		((GRAPHER_MSG*) msg_ptr)->type			 = type;
 		((GRAPHER_MSG*) msg_ptr)->GrapherCommand = command;
-		msgsnd( idFDM, (API_MSG*) msg_ptr, sizeof(GRAPHER_MSG), 0);
+		msgsnd( idFDM, (CONFIG_MSG*) msg_ptr, sizeof(GRAPHER_MSG), 0);
 	}else
 	{
 		return -1;
@@ -50,9 +50,9 @@ int sendMessageToBox(BOX_SELECT box, int idFDM, int type, int command, void* msg
 //////////////////////////////////////////////////////////////////////////////////
 // returns the message type it receives the user must cast it to the expected type
 void* listenForMessage(BOX_SELECT box, int idFDM, int type, int flag){
-
+	
 	if(box==CONFIG_BOX){
-		API_MSG* msg_ptr 	 = malloc(sizeof( (*msg_ptr)));
+		CONFIG_MSG* msg_ptr 	 = malloc(sizeof( (*msg_ptr)));
 		msgrcv(idFDM, msg_ptr, sizeof(*msg_ptr), type, flag);
 		return msg_ptr;
 	}
@@ -64,4 +64,27 @@ void* listenForMessage(BOX_SELECT box, int idFDM, int type, int flag){
 	{
 		return NULL;
 	}
+}
+////////////////////////////////////////////////////////////////////
+//config message initialiser
+void initConfigMessage(
+			CONFIG_MSG*     msg_ptr,		
+			API_EXPORT 		APIExport,
+			ACQUISITION_PT  point,
+			SAMPLING_RATE 	SamplingRate,
+			int 			numberOfBlocks,
+			char 			device[32],
+			char 			fileName[32],
+			char 			host[32],
+			char 			port[8]
+			){
+
+	msg_ptr->APIExport=APIExport;
+	msg_ptr->point=point;
+	msg_ptr->SamplingRate=SamplingRate;
+	msg_ptr->numberOfBlocks=numberOfBlocks;
+	strcpy(msg_ptr->device,device);
+	strcpy(msg_ptr->fileName,fileName);
+	strcpy(msg_ptr->host,host);
+	strcpy(msg_ptr->port,port);
 }

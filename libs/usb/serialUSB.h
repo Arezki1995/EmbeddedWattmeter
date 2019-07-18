@@ -22,8 +22,6 @@
 	// Exports the measurement window as a grapher data file to be plotted
 	int 	   writeGrapherDataFile(u_int16_t* measures, size_t numberOfBlocks);
 	
-	// Exports the measuremet window as a CSV
-	int		   writeToCSV(u_int16_t* measures,size_t numberOfBlocks);
 
 	// Displays raw measurement
 	void       displayMeasures(u_int16_t* measures,size_t numberOfBlocks);

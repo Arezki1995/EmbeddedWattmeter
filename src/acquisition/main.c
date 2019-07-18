@@ -16,7 +16,7 @@
 
 /////////////////////////////////
 char* exportString[]={" ","CSV","GRAPH","NETWORK"};
-
+char* pointsString[]={"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11"};
 ////////// GLOBALS //////////////
 	u_int8_t* 	table=NULL;
 	u_int16_t*  measures=NULL;
@@ -65,11 +65,28 @@ void signal_handler(int signal_number) {
 }
 ///////////////////////////////////////////////////////////////////////////////////
 char* timeStampe(){
-		char* buf= malloc(200*sizeof(char));
-        time_t now = time(0);
-        struct tm tm = *gmtime(&now);
-        strftime(buf, 200, "%H:%M:%S", &tm);
-        return buf;
+	time_t current_time;
+    char* c_time_string;
+
+    /* Obtain current time. */
+    current_time = time(NULL);
+
+    if (current_time == ((time_t)-1))
+    {
+        fprintf(stderr, "Failure to obtain the current time.\n");
+		return "noDate";
+	}
+
+    /* Convert to local time format. */
+    c_time_string = ctime(&current_time);
+
+    if (c_time_string == NULL)
+    {
+        fprintf(stderr, "Failure to convert the current time.\n");
+        return "noDate";
+    }
+
+	return c_time_string;
 }
 ///////////////////////////////////////////////////////////////////////////////////
 void childProcessJob(){
@@ -85,7 +102,7 @@ void childProcessJob(){
 	exit(-1);	
 }
 ///////////////////////////////////////////////////////////////////////////////////
-void setConfiguration(API_MSG config_msg){
+void setConfiguration(CONFIG_MSG config_msg){
 
 		current_APIExport		=config_msg.APIExport;	
 		current_point			=config_msg.point;				
@@ -104,7 +121,7 @@ void setConfiguration(API_MSG config_msg){
 		strcpy(port, 	 config_msg.port);
 }
 ///////////////////////////////////////////////////////////////////////////////////
-void getConfiguration(API_MSG* config_msg_ptr){
+void getConfiguration(CONFIG_MSG* config_msg_ptr){
 	if (config_msg_ptr==NULL)
 	{
 		fprintf(stderr,"[!] getConfiguration: Message struct pointer NULL\n");
@@ -121,24 +138,73 @@ void getConfiguration(API_MSG* config_msg_ptr){
 	strcpy( config_msg_ptr->port	  , port	);
 }
 ///////////////////////////////////////////////////////////////////////////////////
-int startAcquisition(){
+int writeToCSV(u_int16_t* measures, size_t numberOfBlocks, char header[256]){
+	if (measures==NULL)
+	{
+		fprintf(stderr,"[!] Main, writeToCSV: Measurements table is Null\n");
+		return -1;
+	}else{
+		
+		FILE *write_ptr;
+		char outputFile[48];
+		outputFile[47]='\0';
+		sprintf(outputFile, "../data/%s", fileName);
+		write_ptr = fopen(	outputFile	,"a");  // a for append
+		if (write_ptr!=NULL)
+		{	
+			if(header!=NULL){
+				fprintf(write_ptr, header );
+			}
+
+			for (size_t i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
+			{	
+				fprintf(write_ptr,"%d\n",measures[i]);
+			}
+			
+			fclose(write_ptr);
+			return 0;
+		}
+		else{
+			fprintf(stderr,"[!] Unable to open a file for writing.\n");
+			return -1;
+		}
+	}
+}
+///////////////////////////////////////////////////////////////////////////////////
+int  exportAcquisition(char* startTime){
 		int link;
-		// DATA ACQUISITION
-		table 	 = readCurrentRawValues(fd,current_NbOfBlocks);
-		if(table==NULL)    return -1;
 
 		switch (current_APIExport)
 		{
 			case CSV:
+			
 				printf("Exporting to CSV\n");
+				char header[256];
+				if(startTime!=NULL){
+				
+					// Remove new line from timeStamp
+					for (char* p = startTime;( p = strchr(p, '\n')) ; ++p) { *p = ' '; }
+					header[255]='\0';
+					//create the header
+					sprintf(header, "%s, %s, %d\n", startTime, pointsString[current_point], current_samplingRate);
+				}
+
 				measures = formatRawMeasurements(table,current_NbOfBlocks);
 				if(measures==NULL) return -1;
 				
 				free(table);
-				writeToCSV(measures, current_NbOfBlocks);	
+
+				// when no start time is given the header is not writen to the csv
+				if(startTime!=NULL){
+					writeToCSV(measures, current_NbOfBlocks, header);	
+				}else
+				{
+					writeToCSV(measures, current_NbOfBlocks, NULL);
+				}
 				free(measures);
 				break;
 			
+
 			case GRAPH:
 				printf("Exporting to Graph\n");
 				measures = formatRawMeasurements(table,current_NbOfBlocks);
@@ -148,6 +214,7 @@ int startAcquisition(){
 				free(measures);
 				break;
 			
+
 			case NETWORK:
 				//TO BE THREADED
 				printf("Exporting to Network\n");
@@ -163,6 +230,39 @@ int startAcquisition(){
 			default:
 				break;
 		}
+		return 0;
+}
+///////////////////////////////////////////////////////////////////////////////////
+int startAcquisition(int acquisitionMode){
+		
+		// DATA ACQUISITION
+		char* startTime= timeStampe();
+		if(acquisitionMode==API_ACQUIRE){
+			table 	 = readCurrentRawValues(fd,current_NbOfBlocks);
+			if(table==NULL)    return -1;
+			exportAcquisition(startTime);
+		}else
+		{
+			int firstLine=1;
+			while (1)
+			{	
+				CONFIG_MSG* config_msg_ptr =(CONFIG_MSG*) listenForMessage(CONFIG_BOX, Config_MsgBoxID, EXT_TO_API, NON_BLOCKING_MODE);
+				if(config_msg_ptr->APICommand==API_STOP){
+					// Process stop order
+					return 0;
+				}
+				table 	 = readCurrentRawValues(fd,current_NbOfBlocks);
+				if(table==NULL)    return -1;
+				if(firstLine){
+					exportAcquisition(startTime);
+				}else
+				{
+					exportAcquisition(NULL);
+				}
+			}
+		}
+
+	
 	return 0;
 }
 
@@ -217,50 +317,61 @@ int main() {
 						{
 								// wait to get message, treat it, then free it
 								printf("\nListening For Requests:\n");
-								API_MSG* config_msg_ptr =(API_MSG*) listenForMessage(CONFIG_BOX, Config_MsgBoxID,EXT_TO_API,0);
+								CONFIG_MSG* config_msg_ptr =(CONFIG_MSG*) listenForMessage(CONFIG_BOX, Config_MsgBoxID,EXT_TO_API,0);
 								
 								printf("Request Received :%d\n",config_msg_ptr->APICommand);
 								switch (config_msg_ptr->APICommand)
 								{
-									case START:
+									case API_ACQUIRE:
 										//Start acquisition
-										printf("-->START\n");
-										if(startAcquisition()) USBdisconnected=1;
+										printf("-->API_ACQUIRE\n");
+										if(startAcquisition(API_ACQUIRE)) USBdisconnected=1;
 										break;
 
-									case QUIT:
+									case API_FREERUN:
+										//Start free run acquisition
+										printf("-->API_FREERUN\n");
+										if(startAcquisition(API_FREERUN)) USBdisconnected=1;
+										break;
+
+									case API_STOP:
+										printf("-->API_STOP: No FreeRunning Acquisition !\n");
+										break;
+									
+									case API_SET_CONFIG:
+										// Set the current configuration to message content
+										printf("-->API_SET_CONFIG\n");
+										setConfiguration(*config_msg_ptr);
+										displayConfiguration();
+										break;
+
+									case API_GET_CONFIG:
+										//Send back current configuration to External program
+										printf("-->API_GET_CONFIG\n");
+										getConfiguration(config_msg_ptr);
+										sendMessageToBox(CONFIG_BOX,CONFIG_BOX_KEY,API_TO_EXT,API_ACK,config_msg_ptr);
+										break;
+									
+
+									
+									case API_QUIT:
 										//Exit program
-										printf("-->EXIT\n");
+										printf("-->API_QUIT\n");
 										free(config_msg_ptr);
 										close(fd);
 										exit(0);
 										break;
 									
-									case SET_CONFIG:
-										// Set the current configuration to message content
-										printf("-->SET CONF\n");
-										setConfiguration(*config_msg_ptr);
-										displayConfiguration();
-										break;
 
-									case GET_CONFIG:
-										//Send back current configuration to External program
-										printf("-->GET CONF\n");
-										getConfiguration(config_msg_ptr);
-										sendMessageToBox(CONFIG_BOX,CONFIG_BOX_KEY,API_TO_EXT,ACK,config_msg_ptr);
-										break;
+
+
 					
 									default:
 										fprintf(stderr,"[!] Main: API Command not supported\n");
 										break;
 								}
 								free(config_msg_ptr);
-								if (USBdisconnected)
-								{
-									// Loop on the USBLoop
-									break;
-								}
-								
+								if (USBdisconnected) break;
 						}
 				}
 			}

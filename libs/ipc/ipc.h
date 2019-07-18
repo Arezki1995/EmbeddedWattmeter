@@ -2,7 +2,7 @@
 #ifndef _IPC
 #define _IPC
 	
-	// Keys of the different used queus 
+	// Keys of the different used queues 
 	#define CONFIG_BOX_KEY   1995
 	#define GRAPHER_BOX_KEY	 2019
 
@@ -17,18 +17,19 @@
 					EXT_TO_API,
 					API_TO_EXT
 					} 
-	API_MSG_TYPE;
+	CONFIG_MSG_TYPE;
 
 
 // List of Message contents that represent commands to the grapher
 	typedef enum  {	
-					START=1,
-					STOP,
-					SET_CONFIG,
-					GET_CONFIG,
-					ACK,
-					ERROR,
-					QUIT
+					API_ACQUIRE=1,
+					API_FREERUN,
+					API_STOP,
+					API_SET_CONFIG,
+					API_GET_CONFIG,
+					API_ACK,
+					API_ERROR,
+					API_QUIT
 					} API_COMMAND;
 // List of possible output types
 	typedef enum  {
@@ -59,7 +60,7 @@
 
 // Message Struct for messages between an external program and acquisition API
 	typedef struct {
-					API_MSG_TYPE 	type;
+					CONFIG_MSG_TYPE 	type;
 					API_COMMAND  	APICommand;
 					API_EXPORT  	APIExport;			// default csv
 					ACQUISITION_PT  point;				// default A0
@@ -70,7 +71,20 @@
 					char 			host[32];			// default localhost
 					char 			port[8];			// default 9000
 					} 
-	API_MSG;
+	CONFIG_MSG;
+
+// helper function to initialise config messages
+void initConfigMessage(
+			CONFIG_MSG*     msg_ptr,		
+			API_EXPORT 		APIExport,
+			ACQUISITION_PT  point,
+			SAMPLING_RATE 	SamplingRate,
+			int 			numberOfBlocks,
+			char 			device[32],
+			char 			fileName[32],
+			char 			host[32],
+			char 			port[8]
+			);
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////    GRAPHER_BOX    ///////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,9 +142,10 @@
 	void* listenForMessage(BOX_SELECT box, int idFDM, int type, int flag);
 	// Flag types
 	#define BLOCKING_MODE 		0
-	#define NON_BLOCKING_MODE 	0400
+	#define NON_BLOCKING_MODE 	04000
 
 //Removes the Message boxes
 	void deleteMsgBox(int MsgBoxID);
+
 
 #endif

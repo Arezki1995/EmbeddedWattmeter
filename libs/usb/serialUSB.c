@@ -31,7 +31,7 @@ u_int8_t* readCurrentRawValues(int fd, size_t numberOfBlocks){
 			// each time i read a chunk I move the storage pointer by a chunk  
 			// a chunk is 512 bytes better leave this as default
 			bytesRead = read(fd, mainBuffer+(k*BLOCK_SIZE), BLOCK_SIZE);
-			usleep(10);
+			usleep(1);
 
 			// Nothing to be read
 			if (bytesRead == 0)
@@ -106,34 +106,7 @@ int writeGrapherDataFile(u_int16_t* measures, size_t numberOfBlocks){
 		}
 	}
 }
-////////////////////////////////////////////////////////////////////////////////////
-int writeToCSV(u_int16_t* measures, size_t numberOfBlocks){
-	if (measures==NULL)
-	{
-		fprintf(stderr,"[!] writeToCSV: Measurements table is Null\n");
-		return -1;
-	}else{
-		
-		FILE *write_ptr;
 
-		write_ptr = fopen("../data/data.csv","w");  // w for write
-		if (write_ptr!=NULL)
-		{
-			fprintf(write_ptr,"sample,value\n");
-			for (size_t i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
-			{	
-				fprintf(write_ptr,"%li %d\n",i, measures[i]);
-			}
-			
-			fclose(write_ptr);
-			return 0;
-		}
-		else{
-			fprintf(stderr,"[!] Unable to open a file for writing.\n");
-			return -1;
-		}
-	}
-}
 ////////////////////////////////////////////////////////////////////////////////////
 void displayMeasures(u_int16_t* measures, size_t numberOfBlocks){
 	if (measures==NULL)
