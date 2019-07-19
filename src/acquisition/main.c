@@ -58,6 +58,7 @@ void displayConfiguration(){
 void signal_handler(int signal_number) {
     // Exit cleanup code here
 	if(signal_number==SIGINT){
+		DisableCommandPins();
 		deleteMsgBox(Config_MsgBoxID);
 		close(fd);
 		exit(0);
@@ -234,7 +235,7 @@ int  exportAcquisition(char* startTime){
 }
 ///////////////////////////////////////////////////////////////////////////////////
 int startAcquisition(int acquisitionMode){
-		
+
 		// DATA ACQUISITION
 		char* startTime= timeStampe();
 		if(acquisitionMode==API_ACQUIRE){
@@ -265,6 +266,19 @@ int startAcquisition(int acquisitionMode){
 	
 	return 0;
 }
+////////////////
+void ConfigureDUE(){
+	// Send configurations to arduino DUE 
+	// measurement point
+	writeCommand(current_point);
+	// SamplingRate
+	if(current_samplingRate==SR_666K){ writeCommand(ADC_MODE_666K); }
+	if(current_samplingRate==SR_280K){ writeCommand(ADC_MODE_280K); }
+	if(current_samplingRate==SR_125K){ writeCommand(ADC_MODE_125K); }
+	if(current_samplingRate==SR_60K ){ writeCommand(ADC_MODE_60K ); }
+
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////////
 /////////////////////   MAIN   ////////////////////////////////////////////////////
@@ -309,6 +323,10 @@ int main() {
 				EnableIPC_MSGBOX( &Config_MsgBoxID  , CONFIG_BOX_KEY );
 				EnableIPC_MSGBOX( &Grapher_MsgBoxID , GRAPHER_BOX_KEY);
 
+				// Hardware Control pins setup
+				EnableCommandPins();
+				SetCommandPinsDirection();
+				
 				if (USBLoopStatus==0){
 						// Show global configuration parameters
 						displayConfiguration();
@@ -325,12 +343,14 @@ int main() {
 									case API_ACQUIRE:
 										//Start acquisition
 										printf("-->API_ACQUIRE\n");
+										ConfigureDUE();
 										if(startAcquisition(API_ACQUIRE)) USBdisconnected=1;
 										break;
 
 									case API_FREERUN:
 										//Start free run acquisition
 										printf("-->API_FREERUN\n");
+										ConfigureDUE();
 										if(startAcquisition(API_FREERUN)) USBdisconnected=1;
 										break;
 
@@ -341,8 +361,13 @@ int main() {
 									case API_SET_CONFIG:
 										// Set the current configuration to message content
 										printf("-->API_SET_CONFIG\n");
+										
+										// Update configuration variables
 										setConfiguration(*config_msg_ptr);
 										displayConfiguration();
+										
+										
+										
 										break;
 
 									case API_GET_CONFIG:
@@ -359,13 +384,10 @@ int main() {
 										printf("-->API_QUIT\n");
 										free(config_msg_ptr);
 										close(fd);
+										DisableCommandPins();
 										exit(0);
 										break;
 									
-
-
-
-					
 									default:
 										fprintf(stderr,"[!] Main: API Command not supported\n");
 										break;

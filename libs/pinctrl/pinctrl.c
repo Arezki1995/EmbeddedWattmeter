@@ -6,6 +6,9 @@
 #include <unistd.h>
 #include "pinctrl.h"
 
+
+int CMD_PIN[NB_PINS]={16, 13, 20, 19, 12, 26,INTERRUPT_PIN};
+
 ////////////////////////////////////////////////////////////////////////////////
 int GPIOExport(int pin)
 {
@@ -128,6 +131,7 @@ int EnableCommandPins(){
 	for(int i=0;i<NB_PINS;i++){
 		if (-1 == GPIOExport( CMD_PIN[i] ) )  return(1);
 	}
+	return 0;
 }
 /////////////////////////////////////////////////////////////////////////////
 int SetCommandPinsDirection(){
@@ -135,6 +139,7 @@ int SetCommandPinsDirection(){
 	for(int i=0;i<NB_PINS;i++){
 		if ( -1 == GPIODirection( CMD_PIN[i], OUT) ) return(1); 
 	}
+	return 0;
 }
 //////////////////////////////////////////////////////////////////////////////
 int writeCommand(int cmd){
@@ -154,5 +159,6 @@ int DisableCommandPins(){
 	for(int i=0; i<NB_PINS; i++){
 		if (-1 == GPIOUnexport(CMD_PIN[i]))  return(4);
 	}
+	return 0;
 }
 ////////////////////////////////////////////////////////////////////////////////

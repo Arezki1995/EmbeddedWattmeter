@@ -132,7 +132,8 @@ int main(int argc, char* argv[]){
                 break;  
             case '?':  
                 printf("\nUsage: ./interface -c <COMMAND> -e <EXPORT> -m <MSR_POINT> -s <SAMPLING_RATE> -b <NB_BLOCKS> -d <DEVICE> -f <FILE_NAME> -h <SERVER_IP> -p <SERVER_PORT>"
-				 	   "\nRefer to Documentation for accepted values\n"); 
+				 	   "\nRefer to Documentation for accepted values\n");
+						exit(1); 
                 break;  
         }  
     }  

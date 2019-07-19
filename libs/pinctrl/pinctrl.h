@@ -35,8 +35,6 @@
 
 	// command GPIO pins
 	#define INTERRUPT_PIN 6
-	int CMD_PIN[NB_PINS]={16, 13, 20, 19, 12, 26,INTERRUPT_PIN};
-
 
 	int GPIOExport(int pin);
 	int GPIOUnexport(int pin);
