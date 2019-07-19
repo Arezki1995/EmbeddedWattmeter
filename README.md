@@ -1,4 +1,4 @@
-# SerialUSB
+# EmbeddedWattmeter
 DUE ADC through DMA bus with a C serialUSB reader
 
 This project aims to provide the software necessary to drive the embedded wattmeter on the Qarpediem project at IRCICA research Laboratory.
