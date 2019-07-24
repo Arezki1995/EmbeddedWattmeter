@@ -156,8 +156,9 @@ int writeToCSV(u_int16_t* measures, size_t numberOfBlocks, char header[256]){
 			if(header!=NULL){
 				fprintf(write_ptr, header );
 			}
-
-			for (size_t i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
+			
+			size_t i ;
+			for (i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
 			{	
 				fprintf(write_ptr,"%d\n",measures[i]);
 			}
@@ -182,9 +183,9 @@ int  exportAcquisition(char* startTime){
 				printf("Exporting to CSV\n");
 				char header[256];
 				if(startTime!=NULL){
-				
+					char* p;
 					// Remove new line from timeStamp
-					for (char* p = startTime;( p = strchr(p, '\n')) ; ++p) { *p = ' '; }
+					for (p = startTime;( p = strchr(p, '\n')) ; ++p) { *p = ' '; }
 					header[255]='\0';
 					//create the header
 					sprintf(header, "%s, %s, %d\n", startTime, pointsString[current_point], current_samplingRate);
