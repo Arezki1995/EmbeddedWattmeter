@@ -33,7 +33,7 @@
 	#define LOW  0
 	#define HIGH 1
 
-	// command GPIO pins
+	// command GPIO pins on Rpi
 	#define INTERRUPT_PIN 6
 
 	int GPIOExport(int pin);

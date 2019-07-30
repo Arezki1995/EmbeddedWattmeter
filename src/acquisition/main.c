@@ -16,7 +16,7 @@
 
 /////////////////////////////////
 char* exportString[]={" ","CSV","GRAPH","NETWORK"};
-char* pointsString[]={"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11"};
+char* pointsString[]={" " ,"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11"};
 ////////// GLOBALS //////////////
 	u_int8_t* 	table=NULL;
 	u_int16_t*  measures=NULL;
@@ -41,7 +41,7 @@ void displayConfiguration(){
 	printf("\n\tACQUISITION:\n");
 	printf("\t\tdevice\t\t: \t%s\n",device);
 	
-	printf("\t\tMeasure point\t: \tI%d\n",current_point);
+	printf("\t\tMeasure point\t: \t%s\n",pointsString[current_point]);
 	printf("\t\tSamplingRate\t: \t%d Sample/s\n",current_samplingRate);
 	printf("\t\tNB of Blocks\t: \t%d \n",current_NbOfBlocks);
 	printf("\t\texport option\t: \t%s\n",exportString[current_APIExport]);
@@ -271,7 +271,13 @@ int startAcquisition(int acquisitionMode){
 void ConfigureDUE(){
 	// Send configurations to arduino DUE 
 	// measurement point
-	writeCommand(current_point);
+	// The reason there is a shift of 1 in measurement point is the fact that
+	// starting with 0 creates issues with the CONFIG message struct to avoid this
+	// I prefered to start from 1. In the arduino Due Though measurement points are labeled 
+	// starting from 0. this little contraint forces us to adjust the measurement point number 
+	// to the equivalent on the DUE by substracting 1
+	writeCommand(current_point-1);
+	usleep(10);
 	// SamplingRate
 	if(current_samplingRate==SR_666K){ writeCommand(ADC_MODE_666K); }
 	if(current_samplingRate==SR_280K){ writeCommand(ADC_MODE_280K); }
@@ -284,7 +290,12 @@ void ConfigureDUE(){
 ///////////////////////////////////////////////////////////////////////////////////
 /////////////////////   MAIN   ////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////
-int main() {
+int main(int argc , char* argv[]) {
+
+	if(argc ==2){
+		strcpy(device, argv[1]);
+	}
+
 	pid_t childPID;
 	int   childExitStatus;
 	signal(SIGINT, signal_handler);
@@ -365,6 +376,7 @@ int main() {
 										
 										// Update configuration variables
 										setConfiguration(*config_msg_ptr);
+										ConfigureDUE();
 										displayConfiguration();
 										
 										

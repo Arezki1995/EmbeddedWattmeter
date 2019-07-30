@@ -128,7 +128,8 @@ int GPIOWrite(int pin, int value)
 /////////////////////////////////////////////////////////////////////////////
 int EnableCommandPins(){
 	// Enable GPIO pins
-	for(int i=0;i<NB_PINS;i++){
+	int i;
+	for( i=0 ;i<NB_PINS;i++){
 		if (-1 == GPIOExport( CMD_PIN[i] ) )  return(1);
 	}
 	return 0;
@@ -136,14 +137,16 @@ int EnableCommandPins(){
 /////////////////////////////////////////////////////////////////////////////
 int SetCommandPinsDirection(){
 	// Set GPIO directions
-	for(int i=0;i<NB_PINS;i++){
+	int i;
+	for( i=0; i<NB_PINS;i++){
 		if ( -1 == GPIODirection( CMD_PIN[i], OUT) ) return(1); 
 	}
 	return 0;
 }
 //////////////////////////////////////////////////////////////////////////////
 int writeCommand(int cmd){
-	for(int i=0; i<NB_PINS-1; i++){
+	int i;
+	for(i=0; i<NB_PINS-1; i++){
 		if (-1 == GPIOWrite( CMD_PIN[i], _GET_VALUE(cmd,i))) return(3);
 	}
 	
@@ -156,7 +159,8 @@ int writeCommand(int cmd){
 ///////////////////////////////////////////////////////////////////////////////
 int DisableCommandPins(){
 	// Disable GPIO is
-	for(int i=0; i<NB_PINS; i++){
+	int i;
+	for( i=0; i<NB_PINS; i++){
 		if (-1 == GPIOUnexport(CMD_PIN[i]))  return(4);
 	}
 	return 0;

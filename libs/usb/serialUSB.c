@@ -25,7 +25,8 @@ u_int8_t* readCurrentRawValues(int fd, size_t numberOfBlocks){
 		//memset(mainBuffer, 0, numberOfBlocks*BLOCK_SIZE);
 		
 		int bytesRead;
-		for (size_t k = 0; k < numberOfBlocks; k++)
+		size_t k; 
+		for ( k = 0; k < numberOfBlocks; k++)
 		{	
 			// The Idea: I have a main Buffer I can read chunk by chunk from DUE 
 			// each time i read a chunk I move the storage pointer by a chunk  
@@ -65,8 +66,9 @@ u_int16_t* formatRawMeasurements(u_int8_t* table,size_t numberOfBlocks){
 		// to compose a single measure (with the adequate shifting)
 		// this results in a table of "u_int16_t" of half the size of the MainBuffer
 		u_int16_t* measures = malloc((numberOfBlocks)*(BLOCK_SIZE/2)*sizeof(u_int16_t));
-		size_t j=0;	
-		for (size_t i = 0; i <BLOCK_SIZE*numberOfBlocks; i+=2)
+		size_t j=0;
+		size_t i ;	
+		for (i = 0; i <BLOCK_SIZE*numberOfBlocks; i+=2)
 		{	
 			measures[j]= ((table[i+1]&0x00FF)<<8) | ( table[i] & 0x00FF);
 			j++;
@@ -91,10 +93,11 @@ int writeGrapherDataFile(u_int16_t* measures, size_t numberOfBlocks){
 		{
 			//displays the measurements as Voltage = f(time)
 			//time is in seconds at the first column
-			for (size_t i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
+			size_t i;
+			for ( i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
 			{	
 				// Conversion  to real Voltage is made: 4095 max value 3.3 max voltage
-				fprintf(write_ptr,"%li %0.6f\n",i, (measures[i]/4095.0)*3.3);
+				fprintf(write_ptr,"%d %0.6f\n",i, (measures[i]/4095.0)*3.3);
 			}
 			
 			fclose(write_ptr);
@@ -115,10 +118,11 @@ void displayMeasures(u_int16_t* measures, size_t numberOfBlocks){
 	}else{
 		//displays the measurements by index and ADC value
 		//Index is the first column
-		for (size_t i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
+		size_t i = 0;
+		for ( i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
 		{	
 			u_int16_t mesure= ((measures[i+1]&0x00FF)<<8) | ( measures[i] & 0x00FF);
-			printf("%ld\t%d\n",i, mesure);
+			printf("%d\t%d\n",i, mesure);
 		}
 	}	
 }

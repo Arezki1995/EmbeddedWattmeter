@@ -31,16 +31,22 @@ int sendMessageToBox(BOX_SELECT box, int idFDM, int type, int command, void* msg
 
 	if(box==CONFIG_BOX){
 		// OTHER PARAMS HAVE TO BE INITIALIZED OUTSIDE
-		((CONFIG_MSG*) msg_ptr)->type			= type;
+		((CONFIG_MSG*) msg_ptr)->type		= type;
 		((CONFIG_MSG*) msg_ptr)->APICommand	= command;
 		
-		msgsnd(idFDM, (CONFIG_MSG*) msg_ptr, sizeof(CONFIG_MSG), 0);
+		int state1=msgsnd(idFDM, (CONFIG_MSG*) msg_ptr, sizeof(CONFIG_MSG), 0);
+		if(state1<0){
+			fprintf(stderr, "[!] IPC: Error sending message.\n");
+		} 
 	}
 	else if(box==GRAPHER_BOX)
 	{
 		((GRAPHER_MSG*) msg_ptr)->type			 = type;
 		((GRAPHER_MSG*) msg_ptr)->GrapherCommand = command;
-		msgsnd( idFDM, (CONFIG_MSG*) msg_ptr, sizeof(GRAPHER_MSG), 0);
+		int state2=msgsnd( idFDM, (CONFIG_MSG*) msg_ptr, sizeof(GRAPHER_MSG), 0);
+			if(state2<0){
+			fprintf(stderr, "[!] IPC: Error sending message.\n");
+		} 
 	}else
 	{
 		return -1;

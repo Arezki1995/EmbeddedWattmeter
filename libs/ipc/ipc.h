@@ -14,7 +14,7 @@
 // EXT_TO_API   : Category of messages comming from an external program to the acquisition API
 // API_TO_EXT   : Category of messages going from the acquisition API to an external program
 	typedef enum  { 
-					EXT_TO_API,
+					EXT_TO_API=1,
 					API_TO_EXT
 					} 
 	CONFIG_MSG_TYPE;
@@ -53,7 +53,7 @@
 	
 // Possible acquisition points
 	typedef enum  {
-					I0, I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11
+					I0=1, I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11
 					} 
 	ACQUISITION_PT;
 	

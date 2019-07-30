@@ -6,6 +6,7 @@ import pyqtgraph as pg
 import time, threading, sys
 import serial
 import numpy as np
+import sys
 
 
 class SerialReader(threading.Thread):
@@ -109,7 +110,8 @@ class SerialReader(threading.Thread):
 
 # Get handle to serial port
 # (your port string may vary; windows users need 'COMn')
-s = serial.Serial('/dev/ttyACM0')
+
+s = serial.Serial(sys.argv[1])
 
 # Create the GUI
 app = pg.mkQApp()
