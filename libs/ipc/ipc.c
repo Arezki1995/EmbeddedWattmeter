@@ -79,7 +79,6 @@ void initConfigMessage(
 			ACQUISITION_PT  point,
 			SAMPLING_RATE 	SamplingRate,
 			int 			numberOfBlocks,
-			char 			device[32],
 			char 			fileName[32],
 			char 			host[32],
 			char 			port[8]
@@ -89,7 +88,7 @@ void initConfigMessage(
 	msg_ptr->point=point;
 	msg_ptr->SamplingRate=SamplingRate;
 	msg_ptr->numberOfBlocks=numberOfBlocks;
-	strcpy(msg_ptr->device,device);
+
 	strcpy(msg_ptr->fileName,fileName);
 	strcpy(msg_ptr->host,host);
 	strcpy(msg_ptr->port,port);

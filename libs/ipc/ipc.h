@@ -66,7 +66,6 @@
 					ACQUISITION_PT  point;				// default A0
 					SAMPLING_RATE 	SamplingRate;		// default SR_666K
 					int 			numberOfBlocks;		// default 2604 i.e 1 Sec at def Sampling rate
-					char 			device[32];			// default /dev/ttyACM0
 					char 			fileName[32];		// default data.csv
 					char 			host[32];			// default localhost
 					char 			port[8];			// default 9000
@@ -80,7 +79,6 @@ void initConfigMessage(
 			ACQUISITION_PT  point,
 			SAMPLING_RATE 	SamplingRate,
 			int 			numberOfBlocks,
-			char 			device[32],
 			char 			fileName[32],
 			char 			host[32],
 			char 			port[8]

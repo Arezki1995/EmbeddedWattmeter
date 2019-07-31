@@ -15,8 +15,11 @@
 #include "../../libs/ipc/ipc.h"
 
 /////////////////////////////////
+// Display GLOBALS
 char* exportString[]={" ","CSV","GRAPH","NETWORK"};
 char* pointsString[]={" " ,"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11"};
+char* deviceOptions[]={"/dev/ttyACM0","/dev/ttyACM1"};
+int deviceIndex=0;
 ////////// GLOBALS //////////////
 	u_int8_t* 	table=NULL;
 	u_int16_t*  measures=NULL;
@@ -103,25 +106,37 @@ void childProcessJob(){
 	exit(-1);	
 }
 ///////////////////////////////////////////////////////////////////////////////////
-void setConfiguration(CONFIG_MSG config_msg){
-
-		current_APIExport		=config_msg.APIExport;	
-		current_point			=config_msg.point;				
-		current_samplingRate	=config_msg.SamplingRate;
-		current_NbOfBlocks		=config_msg.numberOfBlocks;		
-		
-	// THIS PARAMS HAVE TO BE CORRECTLY INITIALIZED IN THE EXTERNAL PROGRAM
-	// Input validation is not the objective here
-
-		strcpy(device,	 config_msg.device);
-
-		strcpy(fileName, config_msg.fileName);
-
-		strcpy(host,	 config_msg.host);
-
-		strcpy(port, 	 config_msg.port);
+void GrapherProcessJob(){
+	//--------------Child: Grapher-------------
+	#ifdef DEBUG
+		printf("Child: I will execute port detatch\n");
+	#endif
+	execl("./","./Grapher",NULL);
+	exit(-1);	
 }
 ///////////////////////////////////////////////////////////////////////////////////
+// sets current configuration according to input request message
+// according to the export type some field are not set.
+void setConfiguration(CONFIG_MSG config_msg){
+
+	current_APIExport		=config_msg.APIExport;	
+	current_point			=config_msg.point;				
+	current_samplingRate	=config_msg.SamplingRate;
+	current_NbOfBlocks		=config_msg.numberOfBlocks;		
+
+	// THIS PARAMS HAVE TO BE CORRECTLY INITIALIZED IN THE EXTERNAL PROGRAM
+	// USER MUST TAKE CARE OF INPUT VALIDATION
+
+	if(current_APIExport==CSV){
+		strcpy(fileName, config_msg.fileName);
+	}else if(current_APIExport==NETWORK){
+		strcpy(host,	 config_msg.host);
+		strcpy(port, 	 config_msg.port);
+	}
+
+}
+///////////////////////////////////////////////////////////////////////////////////
+// sends back a message with the current configuration
 void getConfiguration(CONFIG_MSG* config_msg_ptr){
 	if (config_msg_ptr==NULL)
 	{
@@ -133,12 +148,12 @@ void getConfiguration(CONFIG_MSG* config_msg_ptr){
 	config_msg_ptr->point     	   = current_point;
 	config_msg_ptr->SamplingRate   = current_samplingRate ;
 	config_msg_ptr->numberOfBlocks = current_NbOfBlocks;		
-	strcpy( config_msg_ptr->device    , device	);
 	strcpy( config_msg_ptr->fileName  , fileName);
 	strcpy( config_msg_ptr->host      , host	);
 	strcpy( config_msg_ptr->port	  , port	);
 }
 ///////////////////////////////////////////////////////////////////////////////////
+// set header to Null if you dont want one for this data chunk
 int writeToCSV(u_int16_t* measures, size_t numberOfBlocks, char header[256]){
 	if (measures==NULL)
 	{
@@ -167,12 +182,13 @@ int writeToCSV(u_int16_t* measures, size_t numberOfBlocks, char header[256]){
 			return 0;
 		}
 		else{
-			fprintf(stderr,"[!] Unable to open a file for writing.\n");
+			fprintf(stderr,"[!] Unable to open the file for writing.\n");
 			return -1;
 		}
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////
+// processes data export depending on the current export configuration
 int  exportAcquisition(char* startTime){
 		int link;
 
@@ -212,6 +228,16 @@ int  exportAcquisition(char* startTime){
 				measures = formatRawMeasurements(table,current_NbOfBlocks);
 				if(measures==NULL) return -1;
 				//TO BE DONE
+				
+				if( (childPID= fork())==0 ) {
+				//--------------Child: Grapher-------------
+				GrapherProcessJob();
+				}
+				else
+				{
+					
+				}
+
 				free(table);
 				free(measures);
 				break;
@@ -294,6 +320,8 @@ int main(int argc , char* argv[]) {
 
 	if(argc ==2){
 		strcpy(device, argv[1]);
+	}else{
+		strcpy(device, deviceOptions[deviceIndex]);
 	}
 
 	pid_t childPID;
@@ -354,6 +382,7 @@ int main(int argc , char* argv[]) {
 								{
 									case API_ACQUIRE:
 										//Start acquisition
+										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_ACQUIRE\n");
 										ConfigureDUE();
 										if(startAcquisition(API_ACQUIRE)) USBdisconnected=1;
@@ -361,39 +390,38 @@ int main(int argc , char* argv[]) {
 
 									case API_FREERUN:
 										//Start free run acquisition
+										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_FREERUN\n");
 										ConfigureDUE();
 										if(startAcquisition(API_FREERUN)) USBdisconnected=1;
 										break;
 
 									case API_STOP:
+										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_STOP: No FreeRunning Acquisition !\n");
 										break;
 									
 									case API_SET_CONFIG:
 										// Set the current configuration to message content
+										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_SET_CONFIG\n");
 										
 										// Update configuration variables
 										setConfiguration(*config_msg_ptr);
 										ConfigureDUE();
 										displayConfiguration();
-										
-										
-										
 										break;
 
 									case API_GET_CONFIG:
 										//Send back current configuration to External program
+										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_GET_CONFIG\n");
 										getConfiguration(config_msg_ptr);
-										sendMessageToBox(CONFIG_BOX,CONFIG_BOX_KEY,API_TO_EXT,API_ACK,config_msg_ptr);
 										break;
-									
-
 									
 									case API_QUIT:
 										//Exit program
+										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_QUIT\n");
 										free(config_msg_ptr);
 										close(fd);
@@ -403,15 +431,20 @@ int main(int argc , char* argv[]) {
 									
 									default:
 										fprintf(stderr,"[!] Main: API Command not supported\n");
+										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ERROR,config_msg_ptr);
 										break;
 								}
+								
 								free(config_msg_ptr);
 								if (USBdisconnected) break;
 						}
 				}
 			}
-			fprintf(stderr,"[!] Verify USB cable...\n\n");
-			sleep(5);
+			fprintf(stderr,"[!] Verify USB cable...\n");
+			deviceIndex++;
+			strcpy(device, deviceOptions[(deviceIndex)%2]);
+			fprintf(stderr,"[!] Testing other device ID...\n\n");
+			sleep(4);
 	}
 	return 0; 
 } 	

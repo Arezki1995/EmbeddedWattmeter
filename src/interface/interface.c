@@ -18,15 +18,14 @@
 	API_EXPORT  		APIExport;	
 	ACQUISITION_PT  	point;				
 	SAMPLING_RATE 		SamplingRate;		
-	int 				numberOfBlocks;		
-	char 				device[32];			
+	int 				numberOfBlocks;			
 	char 				fileName[32];		
 	char 				host[32];			
 	char 				port[8];	
 
 ///////////////////////////////////////////////////////////////////////
 void printUsage(){
-	printf("\nUsage: ./interface -c <COMMAND> -e <EXPORT> -m <MSR_POINT> -s <SAMPLING_RATE> -b <NB_BLOCKS> -d <DEVICE> -f <FILE_NAME> -h <SERVER_IP> -p <SERVER_PORT> \n"); 
+	printf("\nUsage: ./interface -c <COMMAND> -e <EXPORT> -m <MSR_POINT> -s <SAMPLING_RATE> -b <NB_BLOCKS> -f <FILE_NAME> -h <SERVER_IP> -p <SERVER_PORT> \n"); 
 }
 ///////////////////////////////////////////////////////////////////////
 void setSamplingRate(char* optarg){
@@ -87,7 +86,7 @@ void setAPICommand(char* optarg){
 int main(int argc, char* argv[]){
 	int opt;
 
-	while((opt = getopt(argc, argv, "c:e:m:s:b:d:f:h:p:")) != -1)  
+	while((opt = getopt(argc, argv, "c:e:m:s:b:f:h:p:")) != -1)  
     {  
         switch(opt)  
         {  
@@ -111,10 +110,6 @@ int main(int argc, char* argv[]){
 				printf("\tNB of Blocks\t :\t %s\n",optarg);
 				numberOfBlocks=atoi(optarg);
 				break; 
-			case 'd':	
-				printf("\tDevice\t\t :\t %s\n",optarg); 
-				strcpy(device,optarg);
-				break; 
 			case 'f':	
 				printf("\tCSV File name\t :\t %s\n",optarg);
 				strcpy(fileName,optarg);
@@ -131,9 +126,8 @@ int main(int argc, char* argv[]){
                 printf("option needs a value\n");  
                 break;  
             case '?':  
-                printf("\nUsage: ./interface -c <COMMAND> -e <EXPORT> -m <MSR_POINT> -s <SAMPLING_RATE> -b <NB_BLOCKS> -d <DEVICE> -f <FILE_NAME> -h <SERVER_IP> -p <SERVER_PORT>"
-				 	   "\nRefer to Documentation for accepted values\n");
-						exit(1); 
+                printUsage();
+				exit(1); 
                 break;  
         }  
     }  
@@ -141,7 +135,7 @@ int main(int argc, char* argv[]){
 	EnableIPC_MSGBOX( &Config_MsgBoxID  , CONFIG_BOX_KEY );
 	CONFIG_MSG msg;
 	
-	initConfigMessage(&msg, APIExport, point, SamplingRate, numberOfBlocks, device, fileName, host, port);
+	initConfigMessage(&msg, APIExport, point, SamplingRate, numberOfBlocks, fileName, host, port);
 
 	sendMessageToBox(CONFIG_BOX, Config_MsgBoxID, EXT_TO_API, APICommand, &msg);
 

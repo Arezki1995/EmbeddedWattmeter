@@ -22,7 +22,7 @@ int GPIOExport(int pin)
 			trial++;
 			fd = open("/sys/class/gpio/export", O_WRONLY);
 			if(trial > 5) {
-				fprintf(stderr, "[!] GPIO: Failed to open export for writing!\n");
+				fprintf(stderr, "[!] GPIO: Failed to open export for writing! \n");
 				return(-1);
 			}
 			usleep(10);
@@ -43,7 +43,7 @@ int GPIOUnexport(int pin)
 
 		fd = open("/sys/class/gpio/unexport", O_WRONLY);
 		if (-1 == fd) {
-			fprintf(stderr, "[!] GPIO: Failed to open unexport for writing!\n");
+			fprintf(stderr, "[!] GPIO: Failed to open unexport for writing! \n");
 			return(-1);
 		}
 
@@ -63,7 +63,7 @@ int GPIODirection(int pin, int dir)
 		int fd;
 		fd = open(path, O_WRONLY);
 		if (-1 == fd) {
-			fprintf(stderr, "[!] GPIO: Failed to open gpio direction for writing!\n");
+			fprintf(stderr, "[!] GPIO: Failed to open gpio direction for writing! (run as root)\n");
 			return(-1);
 		}
 
