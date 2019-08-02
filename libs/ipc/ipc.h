@@ -90,17 +90,14 @@ void initConfigMessage(
 // FROM_GRAPHER : Category of messages going from Grapher to acquisition API
 // TO_GRAPHER   : Category of messages going from acquisition API to GRAPHER
 	typedef enum  { 
-					FROM_GRAPHER,
+					FROM_GRAPHER=1,
 					TO_GRAPHER
 					} 
 	GRAPHER_MSG_TYPE ;
 
 // List of Message contents that represent commands to the grapher
 	typedef enum  {	
-					GR_OPEN=1,
-					GR_CLOSE,
-					GR_UPDATE,
-					GR_SET,
+					GR_PLOT=1,
 					GR_ACK,
 					GR_ERROR
 					} 

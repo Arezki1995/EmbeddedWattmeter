@@ -18,6 +18,11 @@
 // Display GLOBALS
 char* exportString[]={" ","CSV","GRAPH","NETWORK"};
 char* pointsString[]={" " ,"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11"};
+
+// Values of the shunt resistors to convert current measurement
+// first value is just a place holder
+float ShuntResistors[]={999,0.5, 0.2, 0.2, 1.0, 1.0, 0.5, 0.2, 0.2, 1.0, 0.5, 0.5, 1.0};
+
 char* deviceOptions[]={"/dev/ttyACM0","/dev/ttyACM1"};
 int deviceIndex=0;
 ////////// GLOBALS //////////////
@@ -37,7 +42,7 @@ int deviceIndex=0;
 	char 			host[32]				="127.0.0.1";
 	char 			port[8]					="9000";		
 
-
+	float 			AdcToVoltageCST    = (3.3/4095);
 ///////////////////////////////////////////////////////////////////////////////////
 void displayConfiguration(){
 	printf("######################### CONFIGURATION ########################\n");
@@ -48,7 +53,7 @@ void displayConfiguration(){
 	printf("\t\tSamplingRate\t: \t%d Sample/s\n",current_samplingRate);
 	printf("\t\tNB of Blocks\t: \t%d \n",current_NbOfBlocks);
 	printf("\t\texport option\t: \t%s\n",exportString[current_APIExport]);
-	printf("\t\tfilename\t: \t%s\n",fileName);
+	printf("\t\tCSV filename\t: \t%s\n",fileName);
 
 	printf("\n\tNETWORK:\n");
 	printf("\t\tserver IP\t: \t%s\n",host);
@@ -63,6 +68,7 @@ void signal_handler(int signal_number) {
 	if(signal_number==SIGINT){
 		DisableCommandPins();
 		deleteMsgBox(Config_MsgBoxID);
+		deleteMsgBox(Grapher_MsgBoxID);
 		close(fd);
 		exit(0);
     }
@@ -111,7 +117,7 @@ void GrapherProcessJob(){
 	#ifdef DEBUG
 		printf("Child: I will execute port detatch\n");
 	#endif
-	execl("./","./Grapher",NULL);
+	execl("./Grapher","./Grapher",NULL);
 	exit(-1);	
 }
 ///////////////////////////////////////////////////////////////////////////////////
@@ -154,8 +160,8 @@ void getConfiguration(CONFIG_MSG* config_msg_ptr){
 }
 ///////////////////////////////////////////////////////////////////////////////////
 // set header to Null if you dont want one for this data chunk
-int writeToCSV(u_int16_t* measures, size_t numberOfBlocks, char header[256]){
-	if (measures==NULL)
+int writeToCSV(float* CalibratedMesures, size_t numberOfBlocks, char header[256]){
+	if (CalibratedMesures==NULL)
 	{
 		fprintf(stderr,"[!] Main, writeToCSV: Measurements table is Null\n");
 		return -1;
@@ -175,7 +181,7 @@ int writeToCSV(u_int16_t* measures, size_t numberOfBlocks, char header[256]){
 			size_t i ;
 			for (i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
 			{	
-				fprintf(write_ptr,"%d\n",measures[i]);
+				fprintf(write_ptr,"%0.4f\n",CalibratedMesures[i]);
 			}
 			
 			fclose(write_ptr);
@@ -208,38 +214,73 @@ int  exportAcquisition(char* startTime){
 				}
 
 				measures = formatRawMeasurements(table,current_NbOfBlocks);
+				free(table);
 				if(measures==NULL) return -1;
 				
-				free(table);
-
-				// when no start time is given the header is not writen to the csv
-				if(startTime!=NULL){
-					writeToCSV(measures, current_NbOfBlocks, header);	
-				}else
-				{
-					writeToCSV(measures, current_NbOfBlocks, NULL);
+				//////////////////////////////////
+				// Applying calibration conversion
+				float* CalibratedMesures = malloc( (current_NbOfBlocks*(BLOCK_SIZE/2))*sizeof(float) );
+				int t=0;
+				for(t=0; t<current_NbOfBlocks*(BLOCK_SIZE/2); t++){
+					// Applying the formula to convert voltage measured into Current according to shunt resistor
+					CalibratedMesures[t]= (measures[t] * AdcToVoltageCST) * (1/(ShuntResistors[current_point]*10))  ;
 				}
 				free(measures);
+				// when no start time is given the header is not writen to the csv
+				if(startTime!=NULL){
+					writeToCSV(CalibratedMesures, current_NbOfBlocks, header);	
+				}else
+				{
+					writeToCSV(CalibratedMesures, current_NbOfBlocks, NULL);
+				}
+				free(CalibratedMesures);
 				break;
 			
 
 			case GRAPH:
 				printf("Exporting to Graph\n");
 				measures = formatRawMeasurements(table,current_NbOfBlocks);
+				free(table);
 				if(measures==NULL) return -1;
-				//TO BE DONE
-				
-				if( (childPID= fork())==0 ) {
+		
+				//////////////////////////////////
+				// Applying calibration conversion
+				float* PlotCalibratedMesures = malloc( (current_NbOfBlocks*(BLOCK_SIZE/2))*sizeof(float) );
+				int k=0;
+				for(k=0; k<current_NbOfBlocks*(BLOCK_SIZE/2); k++){
+					// Applying the formula to convert voltage measured into Current according to shunt resistor
+					PlotCalibratedMesures[k]= (measures[k] * AdcToVoltageCST) * (1/(ShuntResistors[current_point]*10))  ;
+				}
+				free(measures);
+
+				// Write to the plot file
+				FILE *write_ptr;
+				write_ptr = fopen(	"../data/plot.dat"	,"w+");
+				if (write_ptr!=NULL)
+				{	
+					int i ;
+					for (i = 0; i <(BLOCK_SIZE/2)*current_NbOfBlocks; i++)
+					{	
+						fprintf(write_ptr,"%0.4f\n",PlotCalibratedMesures[i]);
+					}
+					fclose(write_ptr);
+				}
+				free(PlotCalibratedMesures);
+
+				pid_t GrapherPID;
+				if( (GrapherPID= fork())==0 ) {
 				//--------------Child: Grapher-------------
-				GrapherProcessJob();
+					GrapherProcessJob();
 				}
 				else
 				{
-					
+					GRAPHER_MSG gr_msg;
+					sendMessageToBox(GRAPHER_BOX,Grapher_MsgBoxID,TO_GRAPHER,GR_PLOT,&gr_msg);
+
+					// we wait Until Grapher terminates
+					wait(NULL);
 				}
 
-				free(table);
-				free(measures);
 				break;
 			
 
@@ -374,7 +415,7 @@ int main(int argc , char* argv[]) {
 						while (1)
 						{
 								// wait to get message, treat it, then free it
-								printf("\nListening For Requests:\n");
+								printf("\nAPI Listening For Requests:\n");
 								CONFIG_MSG* config_msg_ptr =(CONFIG_MSG*) listenForMessage(CONFIG_BOX, Config_MsgBoxID,EXT_TO_API,0);
 								
 								printf("Request Received :%d\n",config_msg_ptr->APICommand);
@@ -382,7 +423,7 @@ int main(int argc , char* argv[]) {
 								{
 									case API_ACQUIRE:
 										//Start acquisition
-										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
+										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_ACQUIRE\n");
 										ConfigureDUE();
 										if(startAcquisition(API_ACQUIRE)) USBdisconnected=1;
@@ -390,20 +431,20 @@ int main(int argc , char* argv[]) {
 
 									case API_FREERUN:
 										//Start free run acquisition
-										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
+										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_FREERUN\n");
 										ConfigureDUE();
 										if(startAcquisition(API_FREERUN)) USBdisconnected=1;
 										break;
 
 									case API_STOP:
-										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
+										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_STOP: No FreeRunning Acquisition !\n");
 										break;
 									
 									case API_SET_CONFIG:
 										// Set the current configuration to message content
-										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
+										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_SET_CONFIG\n");
 										
 										// Update configuration variables
@@ -414,18 +455,20 @@ int main(int argc , char* argv[]) {
 
 									case API_GET_CONFIG:
 										//Send back current configuration to External program
-										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
+										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_GET_CONFIG\n");
 										getConfiguration(config_msg_ptr);
 										break;
 									
 									case API_QUIT:
 										//Exit program
-										sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
+										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_QUIT\n");
 										free(config_msg_ptr);
 										close(fd);
 										DisableCommandPins();
+										deleteMsgBox(Config_MsgBoxID);
+										deleteMsgBox(Grapher_MsgBoxID);
 										exit(0);
 										break;
 									

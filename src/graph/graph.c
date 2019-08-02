@@ -12,18 +12,17 @@ int      GrapherBox_ID;
 // PLOTTING SCRIPT XD
 char * plotScript = "set terminal x11\n"
                     "set size noratio\n"
+                    "stats '../data/plot.dat' using 1 nooutput\n"
+                    "set label 1 gprintf(\"Max : %g\", STATS_max)  at 10, STATS_max+STATS_max*0.05\n"
+                    "set label 2 gprintf(\"Moy : %g\", STATS_mean) at 10, STATS_max+STATS_max*0.10\n"
+                    "set label 3 gprintf(\"Min : %g\", STATS_min)  at 10, STATS_max+STATS_max*0.15\n" 
                     "set grid\n"
-                    "set samples 2\n"
-                    "set yrange [0:4]\n"
-                    "set ylabel \"Voltage\"\n"
+                    "set yrange [0:STATS_max+STATS_max*0.25]\n"
+                    "set ylabel \"Current (A)\"\n"
                     "set xlabel \"Samples\"\n"
                     "set title \"Current Evolution\"\n"
-                    "set linetype 1 lc rgb 'green' lw 2 pt 1\n"
-                    "stats '../data/plot.dat' using 2 nooutput\n"
-                    "set label 1 gprintf(\"Maximum = %g\", STATS_max)  at 10, STATS_max+0.6\n"
-                    "set label 2 gprintf(\"Moyenne = %g\", STATS_mean) at 10, STATS_max+0.4\n"
-                    "set label 3 gprintf(\"Minimum = %g\", STATS_min)  at 10, STATS_max+0.2\n" 
-                    "plot  '../data/plot.dat' u 1:2 with lines title 'graph'\n"
+                    "set linetype 1 lc rgb 'blue' lw 0.5 pt 1\n"
+                    "plot  '../data/plot.dat' with lines title 'graph'\n"
                     ;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,23 +37,17 @@ void signal_handler(int signal_number) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-void processMessage(int message){
-    switch (message)
+void processMessage(GRAPHER_MSG* msg_ptr){
+    switch (msg_ptr->GrapherCommand)
     {
-    case GR_OPEN:
-        
+    case GR_PLOT:
+        fprintf(gnuplotPipe, "%s", plotScript);
+        sendMessageToBox(GRAPHER_BOX, GrapherBox_ID, FROM_GRAPHER, GR_ACK, msg_ptr);
         break;
-    case GR_CLOSE:
-        pclose(gnuplotPipe);
-        break;
-    case GR_UPDATE:
-        fprintf(gnuplotPipe, "%s", "reread");
-        
-        break;
-    case GR_SET:
-                
-        break;
+
+
     default:
+        sendMessageToBox(GRAPHER_BOX, GrapherBox_ID, FROM_GRAPHER, GR_ERROR, msg_ptr);
         break;
     }
 }
@@ -67,8 +60,10 @@ int main()
     // gnuplot command line.  "The -persistent" keeps the plot open even after C program terminates.
     signal(SIGINT, signal_handler);
     gnuplotPipe = popen ("gnuplot -geometry 500x300 -persist", "w");
-    //Send Script to gnuplot
-    fprintf(gnuplotPipe, "%s", plotScript); 
+    
+    if(gnuplotPipe<0){
+        fprintf(stderr,"[!] Unable to open a pipe to gnuplot ! Verify that it is correctly installed\n");
+    }
     
     int status= EnableIPC_MSGBOX(&GrapherBox_ID, GRAPHER_BOX_KEY );
     if (status)
@@ -76,19 +71,18 @@ int main()
         fprintf(stderr, "Grapher message queue could not be enabled.\n");
     }
             
-    while (1)
+    printf("Grapher: listening for orders...\n");
+    
+    GRAPHER_MSG* msg_ptr=listenForMessage(GRAPHER_BOX, GrapherBox_ID, TO_GRAPHER,0);    
+    if(msg_ptr!=NULL) 
     {   
-        printf("Grapher: listening for orders...\n");
-        GRAPHER_MSG* msg_ptr=listenForMessage(GRAPHER_BOX, GRAPHER_BOX_KEY, TO_GRAPHER,0);    
-        if(msg_ptr!=NULL) 
-        {
-            printf("Main program: %d\n",msg_ptr->GrapherCommand);
-            processMessage(msg_ptr->GrapherCommand);
-        }
-        
-        sendMessageToBox(GRAPHER_BOX, GrapherBox_ID, FROM_GRAPHER, GR_ACK, msg_ptr);
-        free(msg_ptr);
+        printf("**** Welcome to GRAPHER ! ****\n");
+        printf("Command to execute: %d\n",msg_ptr->GrapherCommand);
+        processMessage(msg_ptr);
     }
     
+    free(msg_ptr);
+    pclose(gnuplotPipe);
+    exit(0);
     return 0;
 }

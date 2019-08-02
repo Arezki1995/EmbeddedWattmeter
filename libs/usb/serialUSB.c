@@ -70,7 +70,7 @@ u_int16_t* formatRawMeasurements(u_int8_t* table,size_t numberOfBlocks){
 		size_t i ;	
 		for (i = 0; i <BLOCK_SIZE*numberOfBlocks; i+=2)
 		{	
-			measures[j]= ((table[i+1]&0x00FF)<<8) | ( table[i] & 0x00FF);
+			measures[j]= 0x0FFF & (((table[i+1]&0x00FF)<<8) | ( table[i] & 0x00FF));
 			j++;
 		}	
 		return measures;

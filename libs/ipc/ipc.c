@@ -20,7 +20,7 @@ int EnableIPC_MSGBOX(int * idFDM_ptr, int FDM_KEY){
 ////////////////////////////////
 void deleteMsgBox(int MsgBoxID){
 	if (msgctl(MsgBoxID, IPC_RMID, NULL) == -1) {
-		fprintf(stderr, "Config queue could not be deleted.\n");
+		fprintf(stderr, "Queue could not be deleted.\n");
 	}
 }
 
@@ -36,6 +36,7 @@ int sendMessageToBox(BOX_SELECT box, int idFDM, int type, int command, void* msg
 		
 		int state1=msgsnd(idFDM, (CONFIG_MSG*) msg_ptr, sizeof(CONFIG_MSG), 0);
 		if(state1<0){
+			perror("IPC:");
 			fprintf(stderr, "[!] IPC: Error sending message.\n");
 		} 
 	}
@@ -43,7 +44,7 @@ int sendMessageToBox(BOX_SELECT box, int idFDM, int type, int command, void* msg
 	{
 		((GRAPHER_MSG*) msg_ptr)->type			 = type;
 		((GRAPHER_MSG*) msg_ptr)->GrapherCommand = command;
-		int state2=msgsnd( idFDM, (CONFIG_MSG*) msg_ptr, sizeof(GRAPHER_MSG), 0);
+		int state2=msgsnd( idFDM, (GRAPHER_MSG*) msg_ptr, sizeof(GRAPHER_MSG), 0);
 			if(state2<0){
 			fprintf(stderr, "[!] IPC: Error sending message.\n");
 		} 
