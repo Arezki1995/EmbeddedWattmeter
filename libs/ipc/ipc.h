@@ -108,6 +108,7 @@ void initConfigMessage(
 	typedef struct {
 					GRAPHER_MSG_TYPE type;
 					GRAPHER_COMMAND  GrapherCommand;
+					char 		 	 payload[128];
 	} 
 	GRAPHER_MSG;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
