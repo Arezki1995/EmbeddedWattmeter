@@ -10,19 +10,16 @@ FILE *   gnuplotPipe;
 int      GrapherBox_ID;
 
 // PLOTTING SCRIPT XD
-char * plotScript = "set terminal x11\n"
+char * plotScript = "set term x11\n"
                     "set size noratio\n"
                     "stats '../data/plot.dat' using 1 nooutput\n"
-                    "set label 1 gprintf(\"Max : %g\", STATS_max)  at 10, STATS_max+STATS_max*0.05\n"
-                    "set label 2 gprintf(\"Moy : %g\", STATS_mean) at 10, STATS_max+STATS_max*0.10\n"
-                    "set label 3 gprintf(\"Min : %g\", STATS_min)  at 10, STATS_max+STATS_max*0.15\n" 
+                    "set label 1 sprintf(\" Max: %d mW    Avg: %d mW    Min: %d mW\", STATS_max, STATS_mean,STATS_min)  at 0, STATS_max+STATS_max*0.15\n"
                     "set grid\n"
-                    "set yrange [0:STATS_max+STATS_max*0.25]\n"
-                    "set ylabel \"Current (A)\"\n"
+                    "set yrange [0:STATS_max+STATS_max*0.20]\n"
+                    "set ylabel \"Instantaneous Power (mW)\"\n"
                     "set xlabel \"Samples\"\n"
-                    "set title \"Current Evolution\"\n"
-                    "set linetype 1 lc rgb 'blue' lw 0.5 pt 1\n"
-                    "plot  '../data/plot.dat' with lines title 'graph'\n"
+                    "set title \"Power Consumption\"\n"
+                    "set linetype 1 lc rgb 'blue' lw 0.01 pt 0.1\n"
                     ;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +38,9 @@ void processMessage(GRAPHER_MSG* msg_ptr){
     switch (msg_ptr->GrapherCommand)
     {
     case GR_PLOT:
+
         fprintf(gnuplotPipe, "%s", plotScript);
+        fprintf(gnuplotPipe, "plot  '../data/plot.dat' with lines title '%s'\n", msg_ptr->payload);
         sendMessageToBox(GRAPHER_BOX, GrapherBox_ID, FROM_GRAPHER, GR_ACK, msg_ptr);
         break;
 
@@ -59,7 +58,7 @@ int main()
     // Opens an interface that one can use to send commands as if they were typing into the
     // gnuplot command line.  "The -persistent" keeps the plot open even after C program terminates.
     signal(SIGINT, signal_handler);
-    gnuplotPipe = popen ("gnuplot -geometry 500x300 -persist", "w");
+    gnuplotPipe = popen ("gnuplot -geometry 800x300 -persist", "w");
     
     if(gnuplotPipe<0){
         fprintf(stderr,"[!] Unable to open a pipe to gnuplot ! Verify that it is correctly installed\n");

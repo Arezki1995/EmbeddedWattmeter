@@ -91,35 +91,27 @@ int main(int argc, char* argv[]){
         switch(opt)  
         {  
             case 'c': 	
-				printf("\n\tCommand\t \t :\t %s\n",optarg);
 				setAPICommand(optarg);
 				break;  
             case 'e': 	
-				printf("\tExport option\t :\t %s\n",optarg);
 				setExportOption(optarg);
 				break; 
 			case 'm':	
-				printf("\tMsr point\t :\t %s\n",optarg);
 				setAcquisitionPoint(optarg);
 				break; 
 			case 's':	
-				printf("\tSampling Rate\t :\t %s\n",optarg);
 				setSamplingRate(optarg);
 				break; 
 			case 'b':	
-				printf("\tNB of Blocks\t :\t %s\n",optarg);
 				numberOfBlocks=atoi(optarg);
 				break; 
 			case 'f':	
-				printf("\tCSV File name\t :\t %s\n",optarg);
 				strcpy(fileName,optarg);
 				break; 
 			case 'h':	
-				printf("\tServer Host IP\t :\t %s\n",optarg);
 				strcpy(host,optarg);
 				break; 
 			case 'p':   
-				printf("\tServer Port\t :\t %s\n",optarg);
 				strcpy(port,optarg);
 				break; 
             case ':':  
@@ -139,7 +131,7 @@ int main(int argc, char* argv[]){
 
 	sendMessageToBox(CONFIG_BOX, Config_MsgBoxID, EXT_TO_API, APICommand, &msg);
 
-	printf(">Request Sent !\n");
+	printf(">Request Sent\n");
 
 	
 	return 0;
