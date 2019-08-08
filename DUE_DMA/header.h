@@ -1,5 +1,6 @@
 // ADC Channel Command Options
 #define ADC_MODE_MSK  0x0F
+#define MUX_MODE_MSK  0x30
 #define ADC_MODE_A0   0x00
 #define ADC_MODE_A1   0x01
 #define ADC_MODE_A2   0x02
@@ -33,3 +34,8 @@
 #define ADC_MODE_280K   0x0D
 #define ADC_MODE_125K   0x0E
 #define ADC_MODE_60K    0x0F
+
+#define MUX_I1_I3_I5  0x00
+#define MUX_I2_I4_I7  0x01
+#define MUX_I6_I8_I10 0x02
+#define MUX_I0_I9_I11 0x03
