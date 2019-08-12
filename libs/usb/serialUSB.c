@@ -21,8 +21,6 @@ u_int8_t* readCurrentRawValues(int fd, size_t numberOfBlocks){
 			return NULL;
 		}
 
-		//clear Memory region
-		//memset(mainBuffer, 0, numberOfBlocks*BLOCK_SIZE);
 		
 		int bytesRead;
 		size_t k; 

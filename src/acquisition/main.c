@@ -149,8 +149,8 @@ char* timeStampe(){
 
 }
 ///////////////////////////////////////////////////////////////////////////////////
-// Child process makes sure the SerialUSB port is not used by OS
-// In order to prevent the operating system from cutting the data sent by the DUE
+// Child process makes sure the data sent through SerialUSB port is treated as raw 
+// data by OS In order to prevent the operating system from cutting the data sent by the DUE
 // Executing this command
 // stty -F "/dev/ttyACMn" raw -iexten -echo -echoe -echok -echoctl -echoke -onlcr
 void childProcessJob(){
@@ -247,25 +247,30 @@ int writeToCSV(u_int16_t* CalibratedMesures, size_t numberOfBlocks, char header[
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////
-int isNotInModal(u_int16_t element, float errorTolerance){
-	printf("%d %f\n", element, errorTolerance);
+int isNotInModal(__attribute__((unused)) u_int16_t element, __attribute__((unused)) float errorTolerance){
+
+	/////////////////////////////////////////////////
+	/////////////////////////////////////////////////
+	///////       MODAL CODE GOES HERE       ////////
+	/////////////////////////////////////////////////
+	/////////////////////////////////////////////////
+
 	return 1;
 }
 ///////////////////////////////////////////////////////////////////////////////////
 // processes data export depending on the current export configuration
-int  exportAcquisition(char* startTime){
+int  ExportAcquisition(char* startTime){
 		
 		// wait for voltage measure to finish if not done yet
 		pthread_join(voltageThread_id, NULL);
 
 		int link;
-
+		char header[256];
+		
 		switch (current_APIExport)
 		{
 			case CSV:
-			
-				printf("Exporting to CSV\n");
-				char header[256];
+				
 				if(startTime!=NULL){
 					char* p;
 					// Remove new line from timeStamp
@@ -303,7 +308,7 @@ int  exportAcquisition(char* startTime){
 			
 
 			case GRAPH:
-				printf("Exporting to Graph\n");
+				printf(">Exporting to Graph\n");
 				measures = formatRawMeasurements(table,current_NbOfBlocks);
 				free(table);
 				if(measures==NULL) return -1;
@@ -374,9 +379,6 @@ int  exportAcquisition(char* startTime){
 					NetCalibratedMesures[n]= (u_int16_t) ((measures[n] * AdcToVoltageCST) * (1/(ShuntResistors[current_point]*10))*(voltageSamples[n/voltageDistributionRatio]))  ;
 				}
 				free(measures);
-
-				
-				printf("Exporting to Network\n");
 				
 				// the pointer offset that stores at each step of the loop the shift of the Block being tested relative to the first element 
 				// in the NetCalibratedMesures array
@@ -429,11 +431,6 @@ void* voltageMeasureThread(__attribute__((unused)) void *vargp) {
     return NULL; 
 }
 ///////////////////////////////////////////////////////////////////////////////////
-void* networkThread(__attribute__((unused)) void *vargp){
-
-	return NULL;
-}
-///////////////////////////////////////////////////////////////////////////////////
 // starts data acquisition depending on acquisitionMode
 int startAcquisition(int acquisitionMode){
 
@@ -444,13 +441,15 @@ int startAcquisition(int acquisitionMode){
 			
 
 			/////////   ACQUIRE MODE /////////
+
 				// Launch voltage measurement thread 
 				pthread_create(&voltageThread_id, NULL, voltageMeasureThread, NULL);
-				
+
+
 				// launch current acquisiton in main thread
 				table 	 = readCurrentRawValues(fd,current_NbOfBlocks);
 				if(table==NULL)    return -1;
-				exportAcquisition(startTime);
+				ExportAcquisition(startTime);
 		}else
 		{
 			//////// FreeRunning MODE ////////
@@ -476,11 +475,11 @@ int startAcquisition(int acquisitionMode){
 					if(table==NULL)    return -1;
 					if(firstLine){
 
-						exportAcquisition(startTime);
+						ExportAcquisition(startTime);
 					}else
 					{
 
-						exportAcquisition(NULL);
+						ExportAcquisition(NULL);
 					}
 				}
 		}
@@ -530,12 +529,11 @@ void ConfigureDUE(){
 	
 	int command = (muxSelect) | (current_point-1);
 	writeCommand(command);
-	usleep(10);
 	// SamplingRate
-	if(current_samplingRate==SR_666K){ writeCommand(ADC_MODE_666K); }
-	if(current_samplingRate==SR_280K){ writeCommand(ADC_MODE_280K); }
-	if(current_samplingRate==SR_125K){ writeCommand(ADC_MODE_125K); }
-	if(current_samplingRate==SR_60K ){ writeCommand(ADC_MODE_60K ); }
+	if(current_samplingRate==SR_666K){ writeCommand( muxSelect | ADC_MODE_666K); }
+	if(current_samplingRate==SR_280K){ writeCommand( muxSelect | ADC_MODE_280K); }
+	if(current_samplingRate==SR_125K){ writeCommand( muxSelect | ADC_MODE_125K); }
+	if(current_samplingRate==SR_60K ){ writeCommand( muxSelect | ADC_MODE_60K ); }
 
 }
 
@@ -614,7 +612,10 @@ int main(int argc , char* argv[]) {
 										//Start acquisition
 										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_ACQUIRE\n");
-										ConfigureDUE();
+										
+										// just to flush the buffer from any previous acquisition
+										free(readCurrentRawValues(fd,50));
+										
 										if(startAcquisition(API_ACQUIRE)) USBdisconnected=1;
 										break;
 
@@ -622,7 +623,10 @@ int main(int argc , char* argv[]) {
 										//Start free run acquisition
 										//sendMessageToBox(CONFIG_BOX,Config_MsgBoxID,API_TO_EXT,API_ACK,config_msg_ptr);
 										printf("-->API_FREERUN\n");
-										ConfigureDUE();
+
+										// just to flush the buffer from any previous acquisition
+										free(readCurrentRawValues(fd,50));
+
 										if(startAcquisition(API_FREERUN)) USBdisconnected=1;
 										break;
 
@@ -639,6 +643,7 @@ int main(int argc , char* argv[]) {
 										// Update configuration variables
 										setConfiguration(*config_msg_ptr);
 										ConfigureDUE();
+										usleep(100);
 										displayConfiguration();
 										break;
 
@@ -676,7 +681,7 @@ int main(int argc , char* argv[]) {
 			deviceIndex++;
 			strcpy(device, deviceOptions[(deviceIndex)%2]);
 			fprintf(stderr,"[!] Testing other device ID...\n\n");
-			sleep(4);
+			sleep(1);
 	}
 	return 0; 
 } 	
