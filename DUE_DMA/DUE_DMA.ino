@@ -40,6 +40,8 @@ void ADC_Handler(){
 //////////////////////////////////////////////////////////////////////
 void PinRead_ISR(){
 
+   adc_init(ADC, SystemCoreClock, ADC_FREQ_MAX, ADC_STARTUP_FAST);
+   
    // Get the state configuration
     
    for(int i=0; i<6;i++){

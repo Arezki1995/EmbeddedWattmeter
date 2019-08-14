@@ -25,7 +25,7 @@ char* pointsString[]={" " ,"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8",
 
 ////////// GLOBALS //////////////
 	u_int8_t* 	table=NULL;
-	u_int16_t*  measures=NULL;
+	u_int16_t*  I=NULL;
 	int 		Config_MsgBoxID;
 	int 		Grapher_MsgBoxID;
 	int 		fd;  
@@ -46,20 +46,29 @@ char* pointsString[]={" " ,"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8",
 /// TO BE DONE
 
 	pthread_t 		voltageThread_id; 
-	float*			voltageSamples;
+	float*			V;
 	
-	// NB_Voltage samples = NBcurrent_samples/voltageDistributionRatio
+	// VDR: voltage distribution ratio 
+	// NB_Voltage samples = NBcurrent_samples/VDR
+	// since we cannot sample voltage very fast we distribute it  
+	// sampling if VDR=64 it means 1 Voltage sample for 64 current Samples
 	// !!! Make sure it is a power of 2 in the range of [2:256]
-	int 			voltageDistributionRatio=64;
+	int 			VDR=64;
 
 // ELECTRICAL SETTINGS FOR CALIBRATION
 
-	// Values of the shunt resistors to convert current measurement in Ohms
+	// Values of the shunt resistors to convert current measurement. expressed in Ohms
 	// first value is just a place holder
-	float ShuntResistors[]		= {-999,0.5, 0.2, 0.2, 1.0, 1.0, 0.5, 0.2, 0.2, 1.0, 0.5, 0.5, 1.0};
+	// THE VALUES with 0.8 are the points with the BLUE current sensor
+	// They have a special formula
+	// I am not sure of the calibration for those because I Have No way to test that in INRIA
+	// so Check them and adapt the calibration if needed but normally it is OK
+	float ShuntResistors[]		= {-999,(0.8), (0.8), 0.2, 1.0, 1.0, 0.5, (0.8), (0.8), 1.0, 0.5, 0.5, 1.0};
 	
-	// Maximum expected currents on measurement points refer to the SEN219 datasheet to understand
-	// tha values choosen here are subjective = (Max measured + some margin)
+	// Maximum expected currents on measurement points to calibrate Voltage measurement
+	// refer to the SEN219 datasheet for more deatils
+	// the values choosen here are subjective = (Max measured + some margin)
+	// the precision is quite good nearly 1% error.
 	// values are in mA
 	// first value is just a place holder
 	float MaxCurrentRatings[]	= {-999 ,600,2000,1200,200,200,600,1000,500,300,300,300,200 };
@@ -213,8 +222,8 @@ void getConfiguration(CONFIG_MSG* config_msg_ptr){
 // Export Acquisition into a CSV File 
 // set header to Null if you dont want one for this data chunk (to use in FreeRunning
 // acquisition for example in order not to write the header many times)
-int writeToCSV(u_int16_t* CalibratedMesures, size_t numberOfBlocks, char header[256]){
-	if (CalibratedMesures==NULL)
+int writeToCSV(u_int16_t* PowerValues, size_t numberOfBlocks, char header[256]){
+	if (PowerValues==NULL)
 	{
 		fprintf(stderr,"[!] Main, writeToCSV: Measurements table is Null\n");
 		return -1;
@@ -234,7 +243,7 @@ int writeToCSV(u_int16_t* CalibratedMesures, size_t numberOfBlocks, char header[
 			size_t i ;
 			for (i = 0; i <(BLOCK_SIZE/2)*numberOfBlocks; i++)
 			{	
-				fprintf(write_ptr,"%d\n",CalibratedMesures[i]);
+				fprintf(write_ptr,"%d\n",PowerValues[i]);
 			}
 			
 			fclose(write_ptr);
@@ -258,9 +267,36 @@ int isNotInModal(__attribute__((unused)) u_int16_t element, __attribute__((unuse
 	return 1;
 }
 ///////////////////////////////////////////////////////////////////////////////////
+u_int16_t* getPower(){
+	u_int16_t* PowerValues = malloc( (current_NbOfBlocks*(BLOCK_SIZE/2))*sizeof(*PowerValues) );
+	int k=0;
+	for(k=0; k<current_NbOfBlocks*(BLOCK_SIZE/2); k++){
+		switch(current_point){
+			case I0:
+			case I1:
+			case I6:
+			case I7:
+				// Calibration formula for the Blue Current Sensors
+				PowerValues[k]= (u_int16_t) ((I[k] * AdcToVoltageCST) * ShuntResistors[current_point] * V[k/VDR]) ;
+				break;
+			default:
+				// Calibration formula for the Red Current Sensors
+				// Applying the formula to convert voltage measured into Current according to shunt resistor
+				// then Power = Current x Voltage : note that voltage is in mV thus we have power in mW
+				PowerValues[k]= (u_int16_t) ((I[k] * AdcToVoltageCST) * (1/(ShuntResistors[current_point]*10))*(V[k/VDR]))  ;
+				break;
+		}
+	}
+
+
+	return PowerValues;
+}
+
+///////////////////////////////////////////////////////////////////////////////////
 // processes data export depending on the current export configuration
 int  ExportAcquisition(char* startTime){
 		
+		// voltage and current thread synchronization
 		// wait for voltage measure to finish if not done yet
 		pthread_join(voltageThread_id, NULL);
 
@@ -280,63 +316,58 @@ int  ExportAcquisition(char* startTime){
 					sprintf(header, "%s, %s, %d\n", startTime, pointsString[current_point], current_samplingRate);
 				}
 
-				measures = formatRawMeasurements(table,current_NbOfBlocks);
+				I = formatRawMeasurements(table,current_NbOfBlocks);
 				free(table);
-				if(measures==NULL) return -1;
+				if(I==NULL) return -1;
 				
-				//////////////////////////////////
-				// Applying calibration conversion
-				u_int16_t* CalibratedMesures = malloc( (current_NbOfBlocks*(BLOCK_SIZE/2))*sizeof(*CalibratedMesures) );
-				int t;
-				for(t=0; t<current_NbOfBlocks*(BLOCK_SIZE/2); t++){
-					// Applying the formula to convert voltage measured into Current according to shunt resistor
-					// then Power = Current x Voltage : note that voltage is in mV thus we have power in mW
-					CalibratedMesures[t]= (u_int16_t) ((measures[t] * AdcToVoltageCST) * (1/(ShuntResistors[current_point]*10))*(voltageSamples[t/voltageDistributionRatio]));
-					
-				}
-				free(measures);
-				free(voltageSamples);
-				// when no start time is given the header is not writen to the csv
+				/////////////////////////////////////////
+				///  Applying calibration conversion  ///
+				/////////////////////////////////////////
+				u_int16_t* PowerValues = getPower();
+				free(I);
+				free(V);
+				// when no start time is given, the header is not writen to the csv !!
 				if(startTime!=NULL){
-					writeToCSV(CalibratedMesures, current_NbOfBlocks, header);	
+					writeToCSV(PowerValues, current_NbOfBlocks, header);	
 				}else
 				{
-					writeToCSV(CalibratedMesures, current_NbOfBlocks, NULL);
+					writeToCSV(PowerValues, current_NbOfBlocks, NULL);
 				}
-				free(CalibratedMesures);
+				free(PowerValues);
 				break;
 			
 
 			case GRAPH:
 				printf(">Exporting to Graph\n");
-				measures = formatRawMeasurements(table,current_NbOfBlocks);
+				I = formatRawMeasurements(table,current_NbOfBlocks);
 				free(table);
-				if(measures==NULL) return -1;
+				if(I==NULL) return -1;
 		
-				//////////////////////////////////
-				// Applying calibration conversion
-				u_int16_t* PlotCalibratedMesures = malloc( (current_NbOfBlocks*(BLOCK_SIZE/2))*sizeof(*PlotCalibratedMesures) );
-				int k=0;
-				for(k=0; k<current_NbOfBlocks*(BLOCK_SIZE/2); k++){
-					// Applying the formula to convert voltage measured into Current according to shunt resistor
-					// then Power = Current x Voltage : note that voltage is in mV thus we have power in mW
-					PlotCalibratedMesures[k]= (u_int16_t) ((measures[k] * AdcToVoltageCST) * (1/(ShuntResistors[current_point]*10))*(voltageSamples[k/voltageDistributionRatio]))  ;
-				}
-				free(measures);
-				free(voltageSamples);
+				/////////////////////////////////////////
+				///  Applying calibration conversion  ///
+				/////////////////////////////////////////
+				u_int16_t* PlotPowerValues = getPower();
+				
+
 				// Write to the plot file
 				FILE *write_ptr;
 				write_ptr = fopen(	"../data/plot.dat"	,"w+");
 				if (write_ptr!=NULL)
 				{	
-					int i ;
+					int i, k;
+					float current ;
 					for (i = 0; i <(BLOCK_SIZE/2)*current_NbOfBlocks; i++)
 					{	
-						fprintf(write_ptr,"%d\n",PlotCalibratedMesures[i]);
+						k=(int) (i/VDR);
+						current=  ( I[i] * AdcToVoltageCST *1000* (1/(ShuntResistors[current_point]*10)) );
+						fprintf(write_ptr,"%d %0.3f %0.1f\n",PlotPowerValues[i], (V[k]/1000), current  );
 					}
 					fclose(write_ptr);
 				}
-				free(PlotCalibratedMesures);
+				
+				free(I);
+				free(V);
+				free(PlotPowerValues);
 
 				pid_t GrapherPID;
 				if( (GrapherPID= fork())==0 ) {
@@ -353,7 +384,7 @@ int  ExportAcquisition(char* startTime){
 					// Remove new line from timeStamp
 					for (p = timeNow;( p = strchr(p, '\n')) ; ++p) { *p = ' '; }
 					
-					sprintf(gr_msg.payload,"Power @ %s, %d Samples/s, %s",pointsString[current_point], current_samplingRate,timeNow);
+					sprintf(gr_msg.payload,"input %s, %d Samples/s, %s",pointsString[current_point], current_samplingRate,timeNow);
 					sendMessageToBox(GRAPHER_BOX,Grapher_MsgBoxID,TO_GRAPHER,GR_PLOT,&gr_msg);
 
 					// we wait Until Grapher terminates
@@ -365,26 +396,21 @@ int  ExportAcquisition(char* startTime){
 
 			case NETWORK:
 
-				measures = formatRawMeasurements(table,current_NbOfBlocks);
+				I = formatRawMeasurements(table,current_NbOfBlocks);
 				free(table);
-				if(measures==NULL) return -1;
+				if(I==NULL) return -1;
 		
-				//////////////////////////////////
-				// Applying calibration conversion
-				u_int16_t* NetCalibratedMesures = malloc( (current_NbOfBlocks*(BLOCK_SIZE/2))*sizeof(*NetCalibratedMesures) );
-				int n;
-				for(n=0; n<current_NbOfBlocks*(BLOCK_SIZE/2); n++){
-					// Applying the formula to convert voltage measured into Current according to shunt resistor
-					// then Power = Current x Voltage : note that voltage is in mV thus we have power in mW
-					NetCalibratedMesures[n]= (u_int16_t) ((measures[n] * AdcToVoltageCST) * (1/(ShuntResistors[current_point]*10))*(voltageSamples[n/voltageDistributionRatio]))  ;
-				}
-				free(measures);
-				
+				/////////////////////////////////////////
+				///  Applying calibration conversion  ///
+				/////////////////////////////////////////
+				u_int16_t* NetPowerValues = getPower();
+				free(I);
+				free(V);
 				// the pointer offset that stores at each step of the loop the shift of the Block being tested relative to the first element 
-				// in the NetCalibratedMesures array
+				// in the NetPowerValues array
 				// |------------------------->chunkShift
  				// [ ----- ][  m-2  ][  m-1  ][   m   ][ ----- ]...
-				// |----------------- NetCalibratedMesures array  ----------------->|
+				// |----------------- NetPowerValues array  ----------------->|
 				int chunkShift;
 				int m;
 				for(m=0; m<current_NbOfBlocks; m++){
@@ -393,7 +419,7 @@ int  ExportAcquisition(char* startTime){
 					
 					// wheather the bloc is in the modal or not
 					// We use a random point on each block for validatiion 
-					if(isNotInModal(NetCalibratedMesures[chunkShift+(rand()%256)],5))
+					if(isNotInModal(NetPowerValues[chunkShift+(rand()%256)],5))
 					{
 						// not in modal we have to send the block
 						// remember calibrated values are 16bits normally i would have sent BLOCK_SIZE/2
@@ -401,7 +427,7 @@ int  ExportAcquisition(char* startTime){
 						// send 256 measures I need to send 512 (chars) and BLOCK_SIZE=512.
 						// [ -- ][ -- ][ -- ]...
 						// [-][-][-][-][-][-]...
-						link=sendTCPmsg(host, (char*)port, (char*)NetCalibratedMesures + chunkShift, (BLOCK_SIZE));
+						link=sendTCPmsg(host, (char*)port, (char*)NetPowerValues + chunkShift, (BLOCK_SIZE));
 						
 						
 						if (!link) 
@@ -411,7 +437,7 @@ int  ExportAcquisition(char* startTime){
 						}
 					}
 				}
-				free(NetCalibratedMesures);
+				free(NetPowerValues);
 				break;
 			
 			default:
@@ -422,11 +448,11 @@ int  ExportAcquisition(char* startTime){
 ///////////////////////////////////////////////////////////////////////////////////
 // Thread function that Measures voltage samples
 void* voltageMeasureThread(__attribute__((unused)) void *vargp) { 
-	int NBsamples =current_NbOfBlocks*(BLOCK_SIZE/(2*voltageDistributionRatio));
-	voltageSamples= malloc( NBsamples * sizeof(float));
+	int NBsamples =current_NbOfBlocks*(BLOCK_SIZE/(2*VDR));
+	V= malloc( NBsamples * sizeof(float));
     int i=0;
 	for(i=0; i<NBsamples ; i++){
-		voltageSamples[i]=getBusVoltage();
+		V[i]=getBusVoltage();
 	}
     return NULL; 
 }
