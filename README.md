@@ -4,6 +4,21 @@ EECIP wattmeter software V.1.0
 L’objectif in fine de ce projet est d’avoir un module embarqué multi-canal capable de fournir des mesures relativement précises de la consommation énergétique d’une plateforme IoT. Les implémentations classiques se basent généralement sur la mesure de la valeur moyenne des grandeures masquant ainsi un aspect dynamique important et ne permettant pas de voir les puissances dissipées à des fréquences relativement plus importantes (au-delà de 10KHz) dues à l’impact du software et des communications qui sont des événements souvent intense et courts. 
 Le module devra donc se greffer sur un noeud du projet Qarpediem pour y faire les mesures. On s'affranchit pour ce prototype de l’optimisation énergétique du module en lui-même car le but est de vérifier la valeur des informations qui peuvent être relevées à partir du noeud.
 
+## How to use
+ 1- Entrez dans le repertoire 'src' puis faire un 'make'. La compilation genère les binaires dans le repértoire 'bin'.
+ 
+ 2- Pour lancer l'API d'acquisition lancez l'executable 'AcquisitionAPI' et laissez tourner.
+ 
+ 3- Actuellement vous disposer de plusieures choix d'interface:
+ 
+    -L'executable 'Interface' pour lancer des acquisitions en ligne de commande. 
+    
+    -L'interface Graphique 'GUI.sh'.
+    
+    -Votre propre programme en implementant la librairie 'IPC' développée plus bas.
+
+Vous trouverez plus d'informations plus bas.
+
 ## Architecture logicielle
 Contraintes matérielles mises à part, le software doit permettre une certaine flexibilité. Il doit fournir une interface d’acquisition pour de futurs programmes dans le cadre du projet EECIP ainsi qu’une interface graphique simple pour pouvoir configurer, lancer et observer des acquisitions. Il doit aussi offrir la possibilité d'effectuer des sauvegardes locales de données où de les envoyer sur une base de données sur le réseau via Ethernet/Wifi.
 Cette architecture repose essentiellement sur les Files de Messages afin gérer les communication inter-processus. L’objectif est d’avoir une approche modulaire du développement.
