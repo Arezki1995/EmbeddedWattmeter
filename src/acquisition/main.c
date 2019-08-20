@@ -31,10 +31,10 @@ char* pointsString[]={" " ,"I0", "I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8",
 	int 		fd;  
 	
 	// configuration defaults
-	API_EXPORT  	current_APIExport		=CSV;	
-	ACQUISITION_PT  current_point			=I0;				
+	API_EXPORT  	current_APIExport		=GRAPH;	
+	ACQUISITION_PT  current_point			=I1;				
 	SAMPLING_RATE 	current_samplingRate	=SR_666K;
-	int 			current_NbOfBlocks		=1;		
+	int 			current_NbOfBlocks		=10;		
 	char 			device[32]				="/dev/ttyACM0";
 	char 			fileName[32]			="data.csv";
 	char 			host[32]				="127.0.0.1";
@@ -620,6 +620,7 @@ int main(int argc , char* argv[]) {
 				// Hardware Control pins setup
 				EnableCommandPins();
 				SetCommandPinsDirection();
+				ConfigureDUE();
 				
 				if (USBLoopStatus==0){
 						// Show global configuration parameters
